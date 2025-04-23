@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+  namespace: my-demo
+  labels:
+    app: nginx
+spec:
+  securityContext:
+    fsGroup: 101
+  containers:
+  - name: nginx
+    image: docker.io/library/nginx:latest
+    securityContext:
+      runAsUser: 101
+      runAsGroup: 101
+    volumeMounts:
+    - name: nginx-config
+      mountPath: /etc/nginx/nginx.conf
+      subPath: nginx.conf
+    - name: nginx-config
+      mountPath: /etc/nginx/conf.d/default.conf
+      subPath: default.conf
+    - name: nginx-cache
+      mountPath: /var/cache/nginx
+    - name: nginx-run
+      mountPath: /run
+    ports:
+    - containerPort: 8080
+  volumes:
+  - name: nginx-config
+    configMap:
+      name: nginx-config
+  - name: nginx-cache
+    emptyDir: {}
+  - name: nginx-run
+    emptyDir: {}
