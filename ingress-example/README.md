@@ -1,4 +1,6 @@
-Video: https://www.bilibili.com/video/BV13DdoYhE1F/?vd_source=8199c71e52e7af8b17093229c514230d 
+Video: https://www.bilibili.com/video/BV13DdoYhE1F/?vd_source=8199c71e52e7af8b17093229c514230d
+
+---
 
 ```bash
 $ sudo k8s kubectl get svc -n ingress-nginx
