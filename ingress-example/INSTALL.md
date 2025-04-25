@@ -118,8 +118,9 @@ configuration (8080 in your Service) is used to route traffic to the backend Ser
 exposed by the Ingress Controller.
 
 In your configuration, the Ingress correctly routes external HTTP requests (on port 80) to the `nginx-service` on port
+
 8080. The `PORTS` column in `kubectl get ingress` reflects the port on which the Ingress Controller listens (80), not
-the backend Service port (8080).
+      the backend Service port (8080).
 
 ### Explanation of Your Setup
 
@@ -432,3 +433,362 @@ spec:
 
 If you need further assistance or want to force the Ingress Controller to use port 8080, let me know, and I can provide
 additional guidance!
+
+
+---
+
+The issue you're encountering is that, even after deleting the `nginx-deployment`, `nginx-service`, and `nginx-ingress`
+resources, you still see an Nginx response (a 404 page) when accessing `http://192.168.1.200`. This is because the
+response is coming from the **Ingress Controller** itself (specifically, the `ingress-nginx-controller` service in the
+`ingress-nginx` namespace), not from your previously deployed Nginx application.
+
+Here’s a detailed explanation and steps to resolve or clarify the situation:
+
+---
+
+### Why This Happens
+
+1. **Ingress Controller's Default Behavior**:
+    - The `ingress-nginx-controller` service (type `LoadBalancer`, exposed via MetalLB at `192.168.1.200`) is running an
+      Nginx-based Ingress Controller.
+    - When you access `http://192.168.1.200`, you're hitting the Ingress Controller's Nginx instance, which listens on
+      port 80 by default (as shown in `PORT(S) 80:30236/TCP`).
+    - Since you deleted the `nginx-ingress` resource, there are no active Ingress rules to route traffic to your
+      `nginx-service`. As a result, the Ingress Controller returns its default backend response, which is an Nginx 404
+      page.
+
+2. **MetalLB and External IP**:
+    - MetalLB assigns the external IP `192.168.1.200` to the `ingress-nginx-controller` service, making it accessible
+      from outside the cluster.
+    - This IP is tied to the Ingress Controller, not your deleted `nginx-service`.
+
+3. **No Residual Resources**:
+    - You successfully deleted the `nginx-deployment`, `nginx-service`, and `navbar-ingress` resources, so they are no
+      longer active.
+    - The 404 response is not from your application but from the Ingress Controller's default backend.
+
+---
+
+### Verification
+
+To confirm that the response is from the Ingress Controller:
+
+1. **Check Running Pods**:
+   Ensure no residual pods from your `nginx-deployment` are running:
+   ```bash
+   kubectl get pods -A -l app=nginx
+   ```
+   If no pods are listed, your application is fully deleted.
+
+2. **Check Ingress Resources**:
+   Verify no Ingress resources remain:
+   ```bash
+   kubectl get ingress -A
+   ```
+   If no `nginx-ingress` is listed, your Ingress is deleted.
+
+3. **Inspect Ingress Controller Logs**:
+   Check the logs of the Ingress Controller to see the 404 response:
+   ```bash
+   kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
+   ```
+   Look for entries indicating a 404 response for requests to `192.168.1.200`.
+
+4. **Check Default Backend**:
+   The Ingress Controller may have a default backend that serves the 404 page. To inspect:
+   ```bash
+   kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=default-backend
+   ```
+   If a default backend pod exists, it’s likely serving the 404 page.
+
+---
+
+### Resolving or Adjusting the Behavior
+
+Depending on your goal, here are a few options:
+
+#### Option 1: Accept the 404 as Expected Behavior
+
+- The 404 response is the default behavior of the Ingress Controller when no Ingress rules match the request.
+- If you don’t need to serve anything at `http://192.168.1.200` right now, this is fine. When you redeploy an Ingress
+  resource (e.g., `nginx-ingress`), it will override the default 404 response and route traffic to your service.
+- No action is needed unless you want to customize the default response (see Option 2).
+
+#### Option 2: Customize the Default Backend
+
+To replace the default 404 page with a custom response (e.g., a different page or service):
+
+1. **Create a Custom Default Backend**:
+   Create a simple Deployment and Service to serve a custom page:
+   ```yaml
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: custom-default-backend
+     namespace: ingress-nginx
+   spec:
+     replicas: 1
+     selector:
+       matchLabels:
+         app: custom-default-backend
+     template:
+       metadata:
+         labels:
+           app: custom-default-backend
+       spec:
+         containers:
+         - name: backend
+           image: nginx:latest
+           ports:
+           - containerPort: 80
+   ---
+   apiVersion: v1
+   kind: Service
+   metadata:
+     name: custom-default-backend
+     namespace: ingress-nginx
+   spec:
+     selector:
+       app: custom-default-backend
+     ports:
+     - protocol: TCP
+       port: 80
+       targetPort: 80
+   ```
+
+2. **Configure Ingress Controller to Use Custom Backend**:
+   Edit the Ingress Controller’s configuration to use the custom backend. This can be done by updating the `ConfigMap`
+   for `ingress-nginx`:
+   ```bash
+   kubectl edit configmap -n ingress-nginx ingress-nginx-controller
+   ```
+   Add or update the `data` section:
+   ```yaml
+   data:
+     custom-http-errors: "404,403,500,503"
+     default-backend-service: "ingress-nginx/custom-default-backend"
+   ```
+
+3. **Apply and Test**:
+   Apply the custom backend:
+   ```bash
+   kubectl apply -f custom-default-backend.yaml
+   ```
+   Restart the Ingress Controller to apply changes:
+   ```bash
+   kubectl rollout restart deployment -n ingress-nginx ingress-nginx-controller
+   ```
+   Test by accessing `http://192.168.1.200`. You should see the default Nginx welcome page (or customize the content in
+   the backend).
+
+#### Option 3: Disable the Ingress Controller
+
+If you don’t need the Ingress Controller running (e.g., temporarily), you can scale it down or delete it:
+
+1. **Scale Down Ingress Controller**:
+   ```bash
+   kubectl scale deployment -n ingress-nginx ingress-nginx-controller --replicas=0
+   ```
+   This stops the Ingress Controller pods, and `http://192.168.1.200` will no longer respond.
+
+2. **Delete Ingress Controller**:
+   If you want to completely remove the Ingress Controller:
+   ```bash
+   kubectl delete -n ingress-nginx deploy/ingress-nginx-controller svc/ingress-nginx-controller
+   ```
+   Note: This will also remove the MetalLB-assigned IP (`192.168.1.200`) until the service is recreated.
+
+   To reinstall later, reapply the nginx-ingress deployment:
+   ```bash
+   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+   ```
+
+#### Option 4: Redeploy Your Nginx Application
+
+If you want to restore your Nginx application and have it respond at `http://192.168.1.200:8080`, reapply the updated
+YAML configuration from our previous discussion. However, note that the Ingress Controller will still listen on port
+80 (not 8080) unless reconfigured.
+
+Here’s a recap of the corrected YAML (with Nginx configured to listen on 8080):
+
+```yaml
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  nginx.conf: |
+    server {
+        listen 8080;
+        location / {
+            root /usr/share/nginx/html;
+            index index.html index.htm;
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx-service
+                port:
+                  number: 8080
+```
+
+```
+
+**Deploy**:
+```bash
+kubectl apply -f nginx-k8s-deployment.yaml
+```
+
+**Test**:
+Access `http://192.168.1.200/`. The Ingress Controller (on port 80) will route traffic to your `nginx-service` on port
+8080, and you should see the Nginx welcome page.
+
+**Cleanup** (if needed):
+
+```bash
+kubectl delete -f nginx-k8s-deployment.yaml
+```
+
+#### Option 5: Make Ingress Controller Listen on Port 8080
+
+If you specifically want the Ingress Controller to listen on port 8080 (instead of 80), you can modify the
+`ingress-nginx-controller` Service:
+
+1. **Edit the Service**:
+   ```bash
+   kubectl edit svc -n ingress-nginx ingress-nginx-controller
+   ```
+   Change the HTTP port from 80 to 8080:
+   ```yaml
+   spec:
+     ports:
+     - name: http
+       port: 8080
+       targetPort: 80
+       protocol: TCP
+     - name: https
+       port: 443
+       targetPort: 443
+       protocol: TCP
+   ```
+
+2. **Restart Ingress Controller**:
+   ```bash
+   kubectl rollout restart deployment -n ingress-nginx ingress-nginx-controller
+   ```
+
+3. **Test**:
+   Access `http://192.168.1.200:8080/`. The Ingress Controller will now listen on 8080, and requests will be routed to
+   your `nginx-service` (if redeployed).
+
+4. **Note**:
+    - MetalLB will still assign `192.168.1.200`, but the port will be 8080.
+    - Ensure your firewall or network allows traffic on port 8080.
+    - This is non-standard, so confirm it aligns with your requirements.
+
+---
+
+### Recommended Action
+
+Since the 404 page is coming from the Ingress Controller’s default backend and your application resources are
+successfully deleted, the simplest solution depends on your goal:
+
+- If you want to restore your Nginx service, redeploy the YAML above and access it via `http://192.168.1.200/` (Ingress
+  Controller on port 80 routing to Service on 8080).
+- If you want to eliminate the 404 page, configure a custom default backend (Option 2) or scale down the Ingress
+  Controller (Option 3).
+- If you specifically need the Ingress Controller on port 8080, follow Option 5.
+
+For most use cases, redeploying the application (Option 4) is the best approach, as it restores your intended
+functionality without altering the standard Ingress Controller behavior.
+
+---
+
+### Debugging Tips
+
+If you encounter issues:
+
+1. **Check Ingress Controller Status**:
+   ```bash
+   kubectl get pods -n ingress-nginx
+   ```
+   Ensure the Ingress Controller pods are running without errors.
+
+2. **Test Service Directly** (if redeployed):
+   Use `kubectl port-forward` to bypass the Ingress Controller:
+   ```bash
+   kubectl port-forward svc/nginx-service 8080:8080
+   ```
+   Access `http://localhost:8080` to verify the Nginx service.
+
+3. **Check MetalLB**:
+   Ensure MetalLB is assigning the IP correctly:
+   ```bash
+   kubectl get ipaddresspool -n metallb-system
+   kubectl get l2advertisement -n metallb-system
+   ```
+
+4. **Network Access**:
+   Verify that `192.168.1.200` is reachable and no firewall is blocking port 80 (or 8080 if reconfigured).
+
+---
+
+If you need further assistance, such as customizing the default backend, changing the Ingress Controller port, or
+debugging specific errors, please let me know!
