@@ -80,3 +80,66 @@ $ curl http://192.168.1.200
 </html>
 ```
 
+---
+
+## 通过path访问群集内部两个不同服务
+
+```bash
+anan@think:~/works/k8s-example/ingress-example$ sudo k8s kubectl apply -f multi-service-ingress-by-path.yaml
+deployment.apps/nginx-deployment created
+service/nginx-service created
+deployment.apps/other-deployment created
+service/other-service created
+Warning: annotation "kubernetes.io/ingress.class" is deprecated, please use 'spec.ingressClassName' instead
+ingress.networking.k8s.io/multi-service-ingress created
+```
+
+---
+
+```bash
+anan@think:~/works/k8s-example/ingress-example$ curl -H "Host: example.com" http://192.168.1.200/nginx
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+---
+
+```bash
+anan@think:~/works/k8s-example/ingress-example$ curl -H "Host: example.com" http://192.168.1.200/other
+Hello from Other Service!
+```
+
+---
+
+```bash
+$ sudo k8s kubectl delete -f multi-service-ingress-by-path.yaml
+
+deployment.apps "nginx-deployment" deleted
+service "nginx-service" deleted
+deployment.apps "other-deployment" deleted
+service "other-service" deleted
+ingress.networking.k8s.io "multi-service-ingress" deleted
+```
+
+---
+
