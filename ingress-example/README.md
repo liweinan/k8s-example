@@ -143,3 +143,62 @@ ingress.networking.k8s.io "multi-service-ingress" deleted
 
 ---
 
+## 通过子域名访问群集内的不同服务
+
+```bash
+$ sudo k8s kubectl apply -f subdomain-ingress.yaml
+deployment.apps/nginx-deployment created
+service/nginx-service created
+deployment.apps/other-deployment created
+service/other-service created
+Warning: annotation "kubernetes.io/ingress.class" is deprecated, please use 'spec.ingressClassName' instead
+ingress.networking.k8s.io/subdomain-ingress created
+```
+
+---
+
+```bash
+anan@think:~/works/k8s-example/ingress-example$ curl -H "Host: nginx.example.com" http://192.168.1.200
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+---
+
+
+```bash
+anan@think:~/works/k8s-example/ingress-example$ curl -H "Host: other.example.com" http://192.168.1.200
+Hello from Other Service!
+```
+
+---
+
+```bash
+$ sudo k8s kubectl delete -f subdomain-ingress.yaml
+deployment.apps "nginx-deployment" deleted
+service "nginx-service" deleted
+deployment.apps "other-deployment" deleted
+service "other-service" deleted
+ingress.networking.k8s.io "subdomain-ingress" deleted
+```
