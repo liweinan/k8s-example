@@ -202,3 +202,7 @@ deployment.apps "other-deployment" deleted
 service "other-service" deleted
 ingress.networking.k8s.io "subdomain-ingress" deleted
 ```
+
+---
+
+Create CRD: https://github.com/liweinan/deepseek-answers/blob/main/files/k8s-crd.md
