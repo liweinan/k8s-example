@@ -37,12 +37,10 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "simpleapp-controller.example.com",
+		Scheme:                        scheme,
+		HealthProbeBindAddress:        probeAddr,
+		LeaderElection:               enableLeaderElection,
+		LeaderElectionID:             "simpleapp-controller.example.com",
 	})
 	if err != nil {
 		ctrl.Log.Error(err, "unable to start manager")

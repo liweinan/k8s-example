@@ -20,7 +20,7 @@ simpleapp-controller/
 
 ## Prerequisites
 
-- Go 1.20 or later
+- Go 1.20
 - Docker
 - Access to a Kubernetes cluster
 - kubectl configured to access your cluster
@@ -33,26 +33,31 @@ simpleapp-controller/
 kubectl apply -f ../simpleapp-crd.yaml
 ```
 
-2. Build the controller Docker image:
+2. Build the controller binary locally (optional, for testing):
 
 ```bash
-# Replace with your Docker registry username
-docker build -t your-dockerhub-username/simpleapp-controller:latest .
+go build -o simpleapp-controller .
 ```
 
-3. Push the image to a container registry:
+3. Build the Docker image:
 
 ```bash
-docker push your-dockerhub-username/simpleapp-controller:latest
+docker build -t simpleapp-controller:latest .
 ```
 
-4. Update the image name in `controller-deployment.yaml` to match your registry:
+4. Verify the Docker image:
+
+```bash
+docker images | grep simpleapp-controller
+```
+
+5. Update the image name in `controller-deployment.yaml` to match your registry:
 
 ```yaml
-image: your-dockerhub-username/simpleapp-controller:latest
+image: simpleapp-controller:latest  # Update this to your registry path if needed
 ```
 
-5. Deploy the controller and RBAC resources:
+6. Deploy the controller and RBAC resources:
 
 ```bash
 kubectl apply -f controller-deployment.yaml
@@ -103,6 +108,13 @@ To run the controller locally for development:
 ```bash
 go run main.go
 ```
+
+## Dependencies
+
+The project uses the following major dependencies:
+- Go 1.20
+- Kubernetes client-go v0.29.0
+- controller-runtime v0.17.0
 
 ## Controller Behavior
 
