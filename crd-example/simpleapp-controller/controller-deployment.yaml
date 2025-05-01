@@ -1,0 +1,52 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: simpleapp-controller
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: simpleapp-controller-role
+rules:
+- apiGroups: ["example.com"]
+  resources: ["simpleapps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["example.com"]
+  resources: ["simpleapps/status"]
+  verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: simpleapp-controller-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: simpleapp-controller
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: simpleapp-controller-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simpleapp-controller
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simpleapp-controller
+  template:
+    metadata:
+      labels:
+        app: simpleapp-controller
+    spec:
+      serviceAccountName: simpleapp-controller
+      containers:
+      - name: controller
+        image: your-dockerhub-username/simpleapp-controller:latest
+        imagePullPolicy: Always 
