@@ -154,14 +154,14 @@ The Dockerfile is configured to support multi-architecture builds:
 
 ```dockerfile
 # Stage 1: Build for AMD64
-FROM --platform=linux/amd64 localhost:5002/python:3.11-slim as amd64_builder
+FROM --platform=linux/amd64 localhost:5002/python:3.11-slim AS amd64_builder
 WORKDIR /build
 RUN echo "Building for AMD64" > arch.txt
 RUN echo "AMD64 specific build steps" > build.log
 RUN echo "Hello from AMD64!" > message.txt
 
 # Stage 2: Build for ARM64
-FROM --platform=linux/arm64 localhost:5002/python:3.11-slim as arm64_builder
+FROM --platform=linux/arm64 localhost:5002/python:3.11-slim AS arm64_builder
 WORKDIR /build
 RUN echo "Building for ARM64" > arch.txt
 RUN echo "ARM64 specific build steps" > build.log
@@ -171,15 +171,18 @@ RUN echo "Hello from ARM64!" > message.txt
 FROM --platform=$BUILDPLATFORM localhost:5002/python:3.11-slim
 WORKDIR /app
 
-# Create a simple Python script to display architecture info
-RUN echo 'import platform; print(f"Running on: {platform.machine()}")' > arch_info.py
-RUN echo 'print("Build log contents:")' >> arch_info.py
-RUN echo 'print("This image was built for:", platform.machine())' >> arch_info.py
-RUN echo 'print("\nMessage:")' >> arch_info.py
-RUN echo 'print("Hello from", platform.machine(), "!")' >> arch_info.py
+# Copy build artifacts from both architectures
+COPY --from=amd64_builder /build/arch.txt /app/amd64_arch.txt
+COPY --from=amd64_builder /build/message.txt /app/amd64_message.txt
+COPY --from=arm64_builder /build/arch.txt /app/arm64_arch.txt
+COPY --from=arm64_builder /build/message.txt /app/arm64_message.txt
+
+# Copy and make the app executable
+COPY app.py .
+RUN chmod +x app.py
 
 # Set the entrypoint
-ENTRYPOINT ["python", "arch_info.py"]
+ENTRYPOINT ["./app.py"]
 ```
 
 ### Key Features of the Multi-Stage Build:
@@ -189,44 +192,45 @@ ENTRYPOINT ["python", "arch_info.py"]
    - `arm64_builder`: Runs on ARM64 platform
    - Each stage can have its own build process and dependencies
 
-2. **Architecture Detection**:
-   - The final image includes a Python script that detects the current architecture
-   - Shows different messages based on the platform it's running on
+2. **Architecture Detection and Artifacts**:
+   - The final image includes build artifacts from both architectures
+   - The Python application displays the current architecture and platform information
+   - Shows build artifacts from both AMD64 and ARM64 builds
 
-3. **Inspecting Build Stage Files**:
-   You can inspect the files generated in the build stages in several ways:
+3. **Example Output**:
+   When running the container on different architectures, you'll see output like this:
 
-   a. Using `docker buildx imagetools inspect`:
    ```bash
-   # Inspect the image manifest
-   docker buildx imagetools inspect weli/multiarch-example:latest
+   # On AMD64:
+   Hello from Python 3.11.12!
+   Running on x86_64 architecture
+   Platform: Linux-xxx-x86_64-with-glibc2.36
+
+   Build artifacts from both architectures:
+
+   AMD64 build info:
+   Building for AMD64
+   Hello from AMD64!
+
+   ARM64 build info:
+   Building for ARM64
+   Hello from ARM64!
+
+   # On ARM64:
+   Hello from Python 3.11.12!
+   Running on aarch64 architecture
+   Platform: Linux-xxx-aarch64-with-glibc2.36
+
+   Build artifacts from both architectures:
+
+   AMD64 build info:
+   Building for AMD64
+   Hello from AMD64!
+
+   ARM64 build info:
+   Building for ARM64
+   Hello from ARM64!
    ```
-
-   b. Running the container with a volume mount:
-   ```bash
-   # Create a directory to store the files
-   mkdir -p build_output
-
-   # Run the container and mount the volume
-   docker run --platform linux/amd64 -v $(pwd)/build_output:/output weli/multiarch-example:latest sh -c "cp /build/* /output/"
-
-   # Check the files
-   ls -l build_output/
-   cat build_output/arch.txt
-   cat build_output/build.log
-   cat build_output/message.txt
-   ```
-
-   c. Using `docker buildx build` with `--output` to save build artifacts:
-   ```bash
-   # Build and save artifacts to a local directory
-   docker buildx build --platform linux/amd64 --output type=local,dest=./build_artifacts .
-   ```
-
-4. **Expected Output**:
-   - Shows the architecture it's running on
-   - Displays platform-specific messages
-   - Demonstrates that the same image can run on different architectures
 
 ## Architecture Compatibility
 
