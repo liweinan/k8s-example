@@ -1,3 +1,5 @@
+// Package main contains the entry point for the SimpleApp controller.
+// This controller watches for SimpleApp custom resources and manages their lifecycle.
 package main
 
 import (
@@ -7,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	_ "k8s.io/client-go/plugin/pkg/client/auth" // Import for authentication providers
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -16,16 +18,22 @@ import (
 	"simpleapp-controller/controllers"
 )
 
+// Global scheme for runtime objects
 var (
 	scheme = runtime.NewScheme()
 )
 
+// init registers the Kubernetes API schemes with our runtime scheme
 func init() {
+	// Add standard Kubernetes types to the scheme
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	// Add our custom SimpleApp types to the scheme
 	utilruntime.Must(examplecomv1.AddToScheme(scheme))
 }
 
+// main is the entry point for the controller
 func main() {
+	// Command line flags for controller configuration
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -34,8 +42,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
 	flag.Parse()
 
+	// Set up structured logging using zap
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
+	// Create a new controller manager with the specified options
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                        scheme,
 		HealthProbeBindAddress:        probeAddr,
@@ -47,6 +57,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set up the SimpleApp reconciler with the manager
 	if err = (&controllers.SimpleAppReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -55,6 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Add health and readiness probes
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		ctrl.Log.Error(err, "unable to set up health check")
 		os.Exit(1)
@@ -64,6 +76,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start the controller manager
 	ctrl.Log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		ctrl.Log.Error(err, "problem running manager")
