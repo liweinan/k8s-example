@@ -13,7 +13,7 @@ RUN echo "ARM64 specific build steps" > build.log
 RUN echo "Hello from ARM64!" > message.txt
 
 # Final stage: Combine results
-FROM --platform=$TARGETPLATFORM localhost:5002/python:3.11-slim
+FROM localhost:5002/python:3.11-slim
 WORKDIR /app
 
 # Clean up any existing files first

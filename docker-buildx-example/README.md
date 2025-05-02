@@ -540,3 +540,39 @@ This setup ensures that:
 1. Build stages run on their specified platforms
 2. The final image automatically matches your host architecture
 3. No platform warning appears when running without `--platform` flag
+
+### Common Build Warnings
+
+When building multi-architecture images, you might encounter these warnings:
+
+1. **Redundant Target Platform Warning**:
+   ```
+   WARN: RedundantTargetPlatform: Setting platform to predefined $TARGETPLATFORM in FROM is redundant
+   ```
+   - This occurs when you explicitly specify `--platform=$TARGETPLATFORM`
+   - Solution: Remove the platform specification from the final stage
+   - Example:
+     ```dockerfile
+     # Instead of:
+     FROM --platform=$TARGETPLATFORM python:3.11-slim
+     
+     # Use:
+     FROM python:3.11-slim
+     ```
+
+2. **Invalid Base Image Platform Warning**:
+   ```
+   WARN: InvalidBaseImagePlatform: Base image was pulled with platform "linux/arm64", expected "linux/amd64"
+   ```
+   - This occurs during multi-arch builds when the base image platform doesn't match the build stage
+   - It's expected behavior and can be safely ignored when:
+     - You're using a local registry
+     - The final image works correctly on all target platforms
+     - The build completes successfully
+   - The warning appears because buildx is checking platform compatibility
+
+3. **Best Practices to Minimize Warnings**:
+   - Use explicit platforms only for build stages
+   - Let the final stage inherit the target platform automatically
+   - Keep base images in your local registry for all target platforms
+   - Verify the final image works on all architectures
