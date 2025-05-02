@@ -1,5 +1,5 @@
 # Use Python slim image as base
-FROM --platform=$BUILDPLATFORM python:3.11-slim
+FROM --platform=$BUILDPLATFORM localhost:5002/python:3.11-slim
 
 # Set working directory
 WORKDIR /app
