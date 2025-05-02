@@ -651,44 +651,61 @@ Note: You'll need to log out and back in for the group changes to take effect.
 
 ### Step 2: Pull and Run the Image
 
-1. **For AMD64/Intel Systems**:
+1. **Check Your System Architecture**:
+   ```bash
+   # Check your system architecture
+   uname -m
+   
+   # For AMD64/Intel systems, this should show: x86_64
+   # For ARM64 systems, this should show: aarch64
+   ```
+
+2. **For AMD64/Intel Systems**:
    ```bash
    # Pull the AMD64-specific version
    docker pull weli/multiarch-example:amd64
 
-   # Run the AMD64 version
+   # Run the AMD64 version (recommended)
    docker run --rm weli/multiarch-example:amd64
 
    # Or use the platform flag to ensure AMD64
    docker run --rm --platform linux/amd64 weli/multiarch-example:latest
    ```
 
-2. **For ARM64 Systems**:
+3. **For ARM64 Systems**:
    ```bash
    # Pull the ARM64-specific version
    docker pull weli/multiarch-example:arm64
 
-   # Run the ARM64 version
+   # Run the ARM64 version (recommended)
    docker run --rm weli/multiarch-example:arm64
 
    # Or use the platform flag to ensure ARM64
    docker run --rm --platform linux/arm64 weli/multiarch-example:latest
    ```
 
-3. **Important Note About Architecture Selection**:
+4. **Important Note About Architecture Selection**:
    - The `latest` tag currently points to the ARM64 version
    - Always use the architecture-specific tag (`amd64` or `arm64`) for your system
    - If using `latest`, always specify the platform with `--platform` flag
    - This ensures you get the correct architecture for your system
+   - The warning about platform mismatch is expected when running a different architecture than your host
+   - The image will still work correctly through emulation
 
 ### Expected Output
 
 When running the container, you should see output similar to:
 
 ```bash
+# For AMD64 systems
 Hello from Python 3.11.12!
-Running on x86_64 architecture  # or aarch64 for ARM64 systems
-Platform: Linux-5.15.0-xx-generic-x86_64-with-glibc2.35  # or similar for your system
+Running on x86_64 architecture
+Platform: Linux-5.15.0-xx-generic-x86_64-with-glibc2.35
+
+# For ARM64 systems
+Hello from Python 3.11.12!
+Running on aarch64 architecture
+Platform: Linux-5.15.0-xx-generic-aarch64-with-glibc2.35
 
 Build artifacts from both architectures:
 
@@ -703,7 +720,17 @@ Hello from ARM64!
 
 ### Troubleshooting
 
-1. **Permission Issues**:
+1. **Platform Mismatch Warning**:
+   If you see a warning like:
+   ```
+   WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8)
+   ```
+   This is expected when:
+   - Running AMD64 image on ARM64 host (or vice versa)
+   - The image will still work through emulation
+   - For best performance, use the architecture-specific tag matching your host
+
+2. **Permission Issues**:
    If you see permission errors, ensure your user is in the docker group:
    ```bash
    # Check if your user is in the docker group
@@ -711,16 +738,6 @@ Hello from ARM64!
    
    # If not, add your user to the docker group
    sudo usermod -aG docker $USER
-   ```
-
-2. **Platform Mismatch**:
-   If you see platform mismatch warnings, use the architecture-specific tag:
-   ```bash
-   # For AMD64 systems
-   docker run --rm weli/multiarch-example:amd64
-   
-   # For ARM64 systems
-   docker run --rm weli/multiarch-example:arm64
    ```
 
 3. **Network Issues**:
