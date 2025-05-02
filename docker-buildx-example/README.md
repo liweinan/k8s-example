@@ -150,26 +150,31 @@ This separation of concerns allows:
 
 ## Dockerfile Explanation
 
-The Dockerfile is configured to support multi-architecture builds:
+The Dockerfile is configured to support multi-architecture builds using architecture-specific base images and a target-platform-based final stage:
 
 ```dockerfile
 # Stage 1: Build for AMD64
-FROM --platform=linux/amd64 localhost:5002/python:3.11-slim AS amd64_builder
+FROM --platform=linux/amd64 localhost:5002/python:3.11-slim-amd64 AS amd64_builder
 WORKDIR /build
 RUN echo "Building for AMD64" > arch.txt
 RUN echo "AMD64 specific build steps" > build.log
 RUN echo "Hello from AMD64!" > message.txt
 
 # Stage 2: Build for ARM64
-FROM --platform=linux/arm64 localhost:5002/python:3.11-slim AS arm64_builder
+FROM --platform=linux/arm64 localhost:5002/python:3.11-slim-arm64 AS arm64_builder
 WORKDIR /build
 RUN echo "Building for ARM64" > arch.txt
 RUN echo "ARM64 specific build steps" > build.log
 RUN echo "Hello from ARM64!" > message.txt
 
 # Final stage: Combine results
-FROM --platform=$BUILDPLATFORM localhost:5002/python:3.11-slim
+FROM localhost:5002/python:3.11-slim-amd64 AS final_amd64
+FROM localhost:5002/python:3.11-slim-arm64 AS final_arm64
+FROM final_$TARGETARCH
 WORKDIR /app
+
+# Clean up any existing files first
+RUN rm -rf /app/*
 
 # Copy build artifacts from both architectures
 COPY --from=amd64_builder /build/arch.txt /app/amd64_arch.txt
@@ -181,56 +186,78 @@ COPY --from=arm64_builder /build/message.txt /app/arm64_message.txt
 COPY app.py .
 RUN chmod +x app.py
 
+# Verify the contents of /app
+RUN ls -la /app
+
 # Set the entrypoint
 ENTRYPOINT ["./app.py"]
 ```
 
 ### Key Features of the Multi-Stage Build:
 
-1. **Platform-Specific Build Stages**:
-   - `amd64_builder`: Runs on AMD64 platform
-   - `arm64_builder`: Runs on ARM64 platform
+1. **Architecture-Specific Base Images**:
+   - Uses tagged base images for each architecture (`python:3.11-slim-amd64` and `python:3.11-slim-arm64`)
+   - Ensures correct base image selection for each build stage
+   - Prevents SHA256 hash confusion issues
+
+2. **Platform-Specific Build Stages**:
+   - `amd64_builder`: Runs on AMD64 platform with AMD64-specific base image
+   - `arm64_builder`: Runs on ARM64 platform with ARM64-specific base image
    - Each stage can have its own build process and dependencies
 
-2. **Architecture Detection and Artifacts**:
-   - The final image includes build artifacts from both architectures
-   - The Python application displays the current architecture and platform information
-   - Shows build artifacts from both AMD64 and ARM64 builds
+3. **Dynamic Final Stage Selection**:
+   - Creates separate final stages for each architecture
+   - Uses `$TARGETARCH` to automatically select the correct final image
+   - Ensures proper runtime environment for each platform
 
-3. **Example Output**:
-   When running the container on different architectures, you'll see output like this:
+4. **Build Artifact Management**:
+   - Cleans up target directory before copying files
+   - Copies build artifacts from both architectures
+   - Verifies file contents with directory listing
+   - Maintains proper file permissions
 
-   ```bash
-   # On AMD64:
-   Hello from Python 3.11.12!
-   Running on x86_64 architecture
-   Platform: Linux-xxx-x86_64-with-glibc2.36
+### Best Practices to Minimize Warnings
 
-   Build artifacts from both architectures:
+1. **Base Image Handling**:
+   - Prepare architecture-specific base images:
+     ```bash
+     # Pull and tag AMD64 image
+     docker pull --platform linux/amd64 python:3.11-slim
+     docker tag python:3.11-slim localhost:5002/python:3.11-slim-amd64
+     
+     # Pull and tag ARM64 image
+     docker pull --platform linux/arm64 python:3.11-slim
+     docker tag python:3.11-slim localhost:5002/python:3.11-slim-arm64
+     
+     # Push to local registry
+     docker push localhost:5002/python:3.11-slim-amd64
+     docker push localhost:5002/python:3.11-slim-arm64
+     ```
+   - Use explicit platform specifications in build stages
+   - Use `$TARGETARCH` for final stage selection
+   - Maintain separate base images for each architecture in local registry
 
-   AMD64 build info:
-   Building for AMD64
-   Hello from AMD64!
+2. **Build and Test Process**:
+   - Build multi-arch images with explicit platforms:
+     ```bash
+     docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push .
+     ```
+   - Test each architecture variant:
+     ```bash
+     # Test native architecture version
+     docker run --rm localhost:5002/multiarch-example:latest
+     
+     # Test specific architecture version
+     docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
+     ```
+   - Verify both architecture variants work correctly
+   - Use `--push` flag to ensure proper image publishing
 
-   ARM64 build info:
-   Building for ARM64
-   Hello from ARM64!
-
-   # On ARM64:
-   Hello from Python 3.11.12!
-   Running on aarch64 architecture
-   Platform: Linux-xxx-aarch64-with-glibc2.36
-
-   Build artifacts from both architectures:
-
-   AMD64 build info:
-   Building for AMD64
-   Hello from AMD64!
-
-   ARM64 build info:
-   Building for ARM64
-   Hello from ARM64!
-   ```
+3. **Platform Selection and Variables**:
+   - Use explicit platform specifications only in build stages
+   - Let final stage inherit target platform through `$TARGETARCH`
+   - Keep base images for all target platforms in local registry
+   - Verify image functionality on all target architectures
 
 ## Architecture Compatibility
 
@@ -570,5 +597,5 @@ When building multi-architecture images, you might encounter these warnings:
 3. **Best Practices to Minimize Warnings**:
    - Use explicit platforms only for build stages
    - Let the final stage inherit the target platform automatically
-   - Keep base images in your local registry for all target platforms
+   - Keep base images for all target platforms in local registry
    - Verify the final image works on all architectures
