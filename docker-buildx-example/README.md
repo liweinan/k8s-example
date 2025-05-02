@@ -508,7 +508,7 @@ This warning is expected when building multi-architecture images and can be safe
 
 When running multi-architecture images, you might see a warning like:
 ```
-WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8)
 ```
 
 This warning appears when:
@@ -662,33 +662,26 @@ Note: You'll need to log out and back in for the group changes to take effect.
 
 2. **For AMD64/Intel Systems**:
    ```bash
-   # Pull the AMD64-specific version
-   docker pull weli/multiarch-example:amd64
-
-   # Run the AMD64 version (recommended)
+   # Pull and run the AMD64-specific version (recommended)
    docker run --rm weli/multiarch-example:amd64
 
-   # Or use the platform flag to ensure AMD64
-   docker run --rm --platform linux/amd64 weli/multiarch-example:latest
+   # Note: Using --platform with latest tag will not work
+   # docker run --rm --platform linux/amd64 weli/multiarch-example:latest  # This will fail
    ```
 
 3. **For ARM64 Systems**:
    ```bash
-   # Pull the ARM64-specific version
-   docker pull weli/multiarch-example:arm64
-
-   # Run the ARM64 version (recommended)
+   # Pull and run the ARM64-specific version (recommended)
    docker run --rm weli/multiarch-example:arm64
 
-   # Or use the platform flag to ensure ARM64
-   docker run --rm --platform linux/arm64 weli/multiarch-example:latest
+   # Or use the latest tag (which points to ARM64)
+   docker run --rm weli/multiarch-example:latest
    ```
 
 4. **Important Note About Architecture Selection**:
-   - The `latest` tag currently points to the ARM64 version
+   - The `latest` tag specifically points to the ARM64 version
+   - You cannot use `--platform` flag with `latest` tag to run a different architecture
    - Always use the architecture-specific tag (`amd64` or `arm64`) for your system
-   - If using `latest`, always specify the platform with `--platform` flag
-   - This ensures you get the correct architecture for your system
    - The warning about platform mismatch is expected when running a different architecture than your host
    - The image will still work correctly through emulation
 
@@ -730,7 +723,24 @@ Hello from ARM64!
    - The image will still work through emulation
    - For best performance, use the architecture-specific tag matching your host
 
-2. **Permission Issues**:
+2. **Platform Mismatch Error**:
+   If you see an error like:
+   ```
+   Error response from daemon: image with reference weli/multiarch-example:latest was found but its platform (linux/arm64) does not match the specified platform (linux/amd64)
+   ```
+   This means:
+   - You're trying to use `--platform` with the `latest` tag
+   - The `latest` tag is specifically pointing to ARM64
+   - Solution: Use the architecture-specific tag instead:
+     ```bash
+     # For AMD64 systems
+     docker run --rm weli/multiarch-example:amd64
+     
+     # For ARM64 systems
+     docker run --rm weli/multiarch-example:arm64
+     ```
+
+3. **Permission Issues**:
    If you see permission errors, ensure your user is in the docker group:
    ```bash
    # Check if your user is in the docker group
@@ -740,7 +750,7 @@ Hello from ARM64!
    sudo usermod -aG docker $USER
    ```
 
-3. **Network Issues**:
+4. **Network Issues**:
    If you have trouble pulling the image, check your network connection and Docker Hub access:
    ```bash
    # Test Docker Hub connectivity
