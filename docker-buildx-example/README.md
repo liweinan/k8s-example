@@ -1,6 +1,15 @@
-# Multi-Architecture Docker Build Example
+# Docker Buildx Multi-Architecture Example
 
-This is a simple example demonstrating how to build Docker images for multiple architectures using Docker Buildx.
+This is a minimal project that demonstrates how to build multi-architecture Docker images using Docker Buildx. The project includes a simple Python application and a Dockerfile configured for multi-arch builds.
+
+## Project Structure
+
+```
+.
+├── Dockerfile          # Multi-arch Dockerfile
+├── app.py             # Simple Python application
+└── README.md          # This file
+```
 
 ## Architecture Overview
 
@@ -71,98 +80,13 @@ sequenceDiagram
     Buildx->>LocalRegistry: Push multi-arch image with manifest
 ```
 
-## Multi-Architecture Image Structure
-
-A multi-architecture Docker image is a single image that contains multiple architecture-specific images within it. Here's how it's structured:
-
-### Image Manifest List
-- A single manifest list (index) that points to multiple architecture-specific manifests
-- Each architecture-specific manifest points to its own set of layers
-- The manifest list contains metadata about which architecture each image supports
-
-### Example Structure
-```
-Multi-arch Image (single tag)
-├── Manifest List
-│   ├── linux/amd64 Manifest
-│   │   └── amd64 Image Layers
-│   └── linux/arm64 Manifest
-│       └── arm64 Image Layers
-```
-
-### Key Points
-1. **Single Tag**: All architectures are accessible through the same image tag
-2. **Automatic Selection**: Docker automatically selects the correct architecture when pulling/running
-3. **Efficient Storage**: Common layers are shared between architectures
-4. **Manifest List**: The top-level manifest contains references to all architecture-specific images
-
-### Verification
-You can inspect the structure of a multi-arch image using:
-```bash
-docker buildx imagetools inspect localhost:5002/multiarch-example:latest
-```
-
-This will show:
-- The manifest list digest
-- Individual manifests for each architecture
-- Platform information for each architecture
-- Layer information for each architecture
-
-## Buildx Architecture Explained
-
-Docker Buildx uses a multi-container architecture to handle multi-architecture builds. Here's a detailed breakdown:
-
-### Components
-
-1. **Buildx Builder Container**
-   - The main container that orchestrates the build process
-   - Manages the creation and coordination of other containers
-   - Handles the final assembly of the multi-architecture image
-
-2. **Build Containers**
-   - Separate containers created for each target architecture
-   - Each build container is specialized for its target architecture
-   - Run in parallel to maximize build efficiency
-   - Example: When building for `linux/amd64` and `linux/arm64`, two separate build containers are created
-
-3. **QEMU Containers**
-   - Created only for non-native architectures
-   - Provide emulation capabilities for cross-architecture builds
-   - Example: When building `amd64` on an `arm64` machine, a QEMU container is created to handle the emulation
-
-### Build Process
-
-1. **Initialization**
-   - The Buildx builder container is created
-   - Build containers are spawned for each target architecture
-   - QEMU containers are created as needed for emulation
-
-2. **Parallel Building**
-   - Each build container works independently
-   - Native architecture builds run directly
-   - Non-native architecture builds use QEMU emulation
-   - Builds proceed in parallel for efficiency
-
-3. **Image Assembly**
-   - Individual architecture-specific images are combined
-   - A manifest list is created to support multiple architectures
-   - The final multi-architecture image is pushed to the registry
-
-### Benefits of This Architecture
-
-- **Parallelization**: Multiple architectures can be built simultaneously
-- **Isolation**: Each build runs in its own container, preventing conflicts
-- **Efficiency**: Native builds don't require emulation
-- **Flexibility**: Easy to add support for new architectures
-- **Reliability**: Issues in one build don't affect others
-
 ## Prerequisites
 
-- Docker Desktop installed (with Buildx support)
-- Docker Hub account (or other container registry)
-- Local Docker registry (optional, for testing)
+- Docker Desktop with Buildx support
+- Docker Hub account (for pushing images)
+- Local Docker registry (for testing)
 
-## Setup Local Registry (Optional)
+## Setup Local Registry
 
 If you want to test locally without pushing to a public registry, you can set up a local registry:
 
@@ -171,97 +95,105 @@ If you want to test locally without pushing to a public registry, you can set up
 docker run -d -p 5002:5000 --name registry registry:2
 ```
 
-## Building the Multi-Architecture Image
+## Building Multi-Architecture Images
 
-1. Login to Docker Hub (if using public registry):
-   ```bash
-   docker login
-   ```
+### 1. Setup Buildx Builder
 
-2. Pull the base image (to avoid network issues during build):
-   ```bash
-   docker pull python:3.11-slim
-   ```
+First, create a Buildx builder that uses the Docker daemon directly:
 
-3. If using local registry, tag and push the base image:
-   ```bash
-   docker tag python:3.11-slim localhost:5002/python:3.11-slim
-   docker push localhost:5002/python:3.11-slim
-   ```
+```bash
+# Create a new builder that uses the Docker daemon directly
+docker buildx create --use --name mybuilder --driver docker-container --driver-opt network=host
+```
 
-4. Create and configure a Buildx builder:
-   ```bash
-   docker buildx create --use --name mybuilder --driver-opt network=host
-   ```
+### 2. Build and Push to Local Registry
 
-5. Build and push the multi-architecture image:
-   ```bash
-   # For local registry
-   docker buildx build \
-     --platform linux/amd64,linux/arm64 \
-     -t localhost:5002/multiarch-example:latest \
-     --push .
+First, build and push the multi-architecture image to your local registry:
 
-   # For Docker Hub
-   docker buildx build \
-     --platform linux/amd64,linux/arm64 \
-     -t yourusername/multiarch-example:latest \
-     --push .
-   ```
+```bash
+# Build and push to local registry
+docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push .
+```
 
-## Verifying the Build
+### 3. Verify the Build
 
-Check the supported architectures:
+After pushing to the local registry, you can verify the multi-architecture image:
+
+1. Check the supported architectures:
 ```bash
 docker buildx imagetools inspect localhost:5002/multiarch-example:latest
 ```
 
-## Testing the Image
+2. Test the image on different architectures:
+```bash
+# Run on your native architecture (e.g., arm64 on Apple Silicon)
+docker run --rm localhost:5002/multiarch-example:latest
 
-You can test the image on different architectures:
-
-1. Run on your native architecture (e.g., arm64 on Apple Silicon):
-   ```bash
-   docker run --rm localhost:5002/multiarch-example:latest
-   ```
-
-2. Run on a specific architecture (requires QEMU):
-   ```bash
-   docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
-   ```
+# Run on a specific architecture (requires QEMU)
+docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
+```
 
 The application will display:
 - Python version
 - Architecture information
 - Platform details
 
-## Troubleshooting
+### 4. Manual Process to Push to Docker Hub
 
-If you encounter network issues during the build:
-1. Pull the base image manually first
-2. Use a local registry for testing
-3. Configure Buildx with host network access
-4. Tag and push the base image to your local registry
+Due to potential network issues with Buildx accessing Docker Hub directly, we can use a manual process to push multi-arch images:
 
-## Cleanup
-
-To remove the Buildx builder:
+1. Pull the multi-arch image from local registry:
 ```bash
-docker buildx rm mybuilder
+docker pull localhost:5002/multiarch-example:latest
 ```
 
-To stop and remove the local registry:
+2. Tag and push each architecture separately:
 ```bash
-docker stop registry
-docker rm registry
+# For ARM64
+docker pull --platform linux/arm64 localhost:5002/multiarch-example:latest
+docker tag localhost:5002/multiarch-example:latest weli/multiarch-example:arm64
+docker push weli/multiarch-example:arm64
+
+# For AMD64
+docker pull --platform linux/amd64 localhost:5002/multiarch-example:latest
+docker tag localhost:5002/multiarch-example:latest weli/multiarch-example:amd64
+docker push weli/multiarch-example:amd64
 ```
 
-## Notes
+3. Verify the images on Docker Hub:
+```bash
+# Verify ARM64
+docker pull --platform linux/arm64 weli/multiarch-example:arm64
 
-- The application will display the Python version and the architecture it's running on
-- The Dockerfile uses `--platform=$BUILDPLATFORM` to ensure proper multi-architecture support
-- The image is based on Python 3.11 slim for a smaller footprint
-- Using a local registry is helpful for testing without pushing to public registries 
+# Verify AMD64
+docker pull --platform linux/amd64 weli/multiarch-example:amd64
+```
+
+## Dockerfile Explanation
+
+The Dockerfile is configured to support multi-architecture builds:
+
+```dockerfile
+# Use Python slim image as base
+FROM --platform=$BUILDPLATFORM localhost:5002/python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy the application
+COPY app.py .
+
+# Make the script executable
+RUN chmod +x app.py
+
+# Set the entrypoint
+ENTRYPOINT ["./app.py"]
+```
+
+Key points:
+- `--platform=$BUILDPLATFORM` ensures the base image matches the target platform
+- The application is copied and made executable
+- The entrypoint is set to run the application
 
 ## Architecture Selection Process
 
@@ -319,16 +251,27 @@ docker run --platform linux/arm64 multiarch-example:latest
 | amd64            | amd64, x86_64       |
 | arm/v7           | arm/v7, arm32       |
 
-### Verification
+## Troubleshooting
 
-You can check which architecture is being used:
+If you encounter network issues when pushing directly to Docker Hub with Buildx, use the manual process described above. This approach:
+1. Builds the multi-arch image locally
+2. Pushes to a local registry
+3. Manually tags and pushes each architecture to Docker Hub
+4. Verifies the images can be pulled for each architecture
 
+## Cleanup
+
+To remove the Buildx builder:
 ```bash
-# Check image architecture
-docker inspect --format='{{.Architecture}}' multiarch-example:latest
-
-# Run and check architecture
-docker run --rm multiarch-example:latest
+docker buildx rm mybuilder
 ```
 
-The output will show the actual architecture being used. 
+To stop and remove the local registry:
+```bash
+docker stop registry
+docker rm registry
+```
+
+## License
+
+MIT 
