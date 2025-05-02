@@ -410,6 +410,10 @@ docker push weli/multiarch-example:arm64
 docker pull --platform linux/amd64 localhost:5002/multiarch-example:latest
 docker tag localhost:5002/multiarch-example:latest weli/multiarch-example:amd64
 docker push weli/multiarch-example:amd64
+
+# Update the latest tag to point to the current architecture
+docker tag weli/multiarch-example:$(uname -m) weli/multiarch-example:latest
+docker push weli/multiarch-example:latest
 ```
 
 3. Verify the images on Docker Hub:
@@ -419,6 +423,9 @@ docker pull --platform linux/arm64 weli/multiarch-example:arm64
 
 # Verify AMD64
 docker pull --platform linux/amd64 weli/multiarch-example:amd64
+
+# Verify latest tag
+docker pull weli/multiarch-example:latest
 ```
 
 ### Step 7: Cleanup
@@ -603,3 +610,119 @@ When building multi-architecture images, you might encounter these warnings:
    - Let the final stage inherit the target platform automatically
    - Keep base images for all target platforms in local registry
    - Verify the final image works on all architectures
+
+## Running on Ubuntu Linux
+
+To run the multi-architecture image on Ubuntu Linux, follow these steps:
+
+### Step 1: Install Docker
+
+If Docker is not already installed, install it using the official Docker repository:
+
+```bash
+# Update package index
+sudo apt-get update
+
+# Install required packages
+sudo apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Set up the stable repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker Engine
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+```
+
+Note: You'll need to log out and back in for the group changes to take effect.
+
+### Step 2: Pull and Run the Image
+
+1. **For AMD64/Intel Systems**:
+   ```bash
+   # Pull the image (Docker will automatically select the AMD64 version)
+   docker pull weli/multiarch-example:latest
+
+   # Run the container
+   docker run --rm weli/multiarch-example:latest
+   ```
+
+2. **For ARM64 Systems**:
+   ```bash
+   # Pull the image (Docker will automatically select the ARM64 version)
+   docker pull weli/multiarch-example:latest
+
+   # Run the container
+   docker run --rm weli/multiarch-example:latest
+   ```
+
+3. **Force Specific Architecture**:
+   ```bash
+   # Force AMD64 version (useful for testing)
+   docker run --rm --platform linux/amd64 weli/multiarch-example:latest
+
+   # Force ARM64 version (useful for testing)
+   docker run --rm --platform linux/arm64 weli/multiarch-example:latest
+   ```
+
+### Expected Output
+
+When running the container, you should see output similar to:
+
+```bash
+Hello from Python 3.11.12!
+Running on x86_64 architecture  # or aarch64 for ARM64 systems
+Platform: Linux-5.15.0-xx-generic-x86_64-with-glibc2.35  # or similar for your system
+
+Build artifacts from both architectures:
+
+AMD64 build info:
+Building for AMD64
+Hello from AMD64!
+
+ARM64 build info:
+Building for ARM64
+Hello from ARM64!
+```
+
+### Troubleshooting
+
+1. **Permission Issues**:
+   If you see permission errors, ensure your user is in the docker group:
+   ```bash
+   # Check if your user is in the docker group
+   groups
+   
+   # If not, add your user to the docker group
+   sudo usermod -aG docker $USER
+   ```
+
+2. **Platform Mismatch**:
+   If you see platform mismatch warnings, explicitly specify the platform:
+   ```bash
+   # For AMD64 systems
+   docker run --rm --platform linux/amd64 weli/multiarch-example:latest
+   
+   # For ARM64 systems
+   docker run --rm --platform linux/arm64 weli/multiarch-example:latest
+   ```
+
+3. **Network Issues**:
+   If you have trouble pulling the image, check your network connection and Docker Hub access:
+   ```bash
+   # Test Docker Hub connectivity
+   docker run --rm hello-world
+   ```
