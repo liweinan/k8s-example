@@ -337,16 +337,20 @@ docker buildx create --use --name mybuilder --driver docker-container --driver-o
 
 ### Step 3: Prepare Base Images
 
-Before building the multi-arch image, prepare the base images in the local registry:
+Before building the multi-arch image, prepare architecture-specific base images in the local registry:
 
 ```bash
-# Pull the Python slim image for both architectures
+# Pull and tag AMD64 image
 docker pull --platform linux/amd64 python:3.11-slim
-docker pull --platform linux/arm64 python:3.11-slim
+docker tag python:3.11-slim localhost:5002/python:3.11-slim-amd64
 
-# Tag and push to local registry
-docker tag python:3.11-slim localhost:5002/python:3.11-slim
-docker push localhost:5002/python:3.11-slim
+# Pull and tag ARM64 image
+docker pull --platform linux/arm64 python:3.11-slim
+docker tag python:3.11-slim localhost:5002/python:3.11-slim-arm64
+
+# Push to local registry
+docker push localhost:5002/python:3.11-slim-amd64
+docker push localhost:5002/python:3.11-slim-arm64
 ```
 
 ### Step 4: Build and Push to Local Registry
@@ -372,7 +376,7 @@ docker buildx imagetools inspect localhost:5002/multiarch-example:latest
 2. Test the image on different architectures:
 ```bash
 # Run on your native architecture (e.g., ARM64 for Apple Silicon)
-docker run --rm --platform linux/arm64 localhost:5002/multiarch-example:latest
+docker run --rm localhost:5002/multiarch-example:latest
 
 # Run on AMD64 (will use emulation if not on AMD64 machine)
 docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
