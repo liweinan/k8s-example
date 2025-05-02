@@ -344,10 +344,10 @@ docker buildx imagetools inspect localhost:5002/multiarch-example:latest
 
 2. Test the image on different architectures:
 ```bash
-# Run on your native architecture (e.g., arm64 on Apple Silicon)
-docker run --rm localhost:5002/multiarch-example:latest
+# Run on your native architecture (e.g., ARM64 for Apple Silicon)
+docker run --rm --platform linux/arm64 localhost:5002/multiarch-example:latest
 
-# Run on a specific architecture (requires QEMU)
+# Run on AMD64 (will use emulation if not on AMD64 machine)
 docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
 ```
 
@@ -355,6 +355,9 @@ The application will display:
 - Python version
 - Architecture information
 - Platform details
+- Build artifacts from both architectures
+
+Always test both architectures to ensure your multi-arch build is working correctly. Using the `--platform` flag ensures you're testing the specific architecture variant you intend to verify.
 
 ### Step 6: Manual Process to Push to Docker Hub
 
@@ -466,3 +469,74 @@ This warning is expected when building multi-architecture images and can be safe
 ## License
 
 MIT
+
+### Platform Selection Warning
+
+When running multi-architecture images, you might see a warning like:
+```
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+```
+
+This warning appears when:
+1. You're running on one architecture (e.g., ARM64/Apple Silicon)
+2. Docker pulls the image variant for a different architecture (e.g., AMD64)
+3. No specific platform was requested in the run command
+
+To resolve this, explicitly specify the platform when running the container:
+
+```bash
+# Run using your host's native architecture
+docker run --rm --platform linux/arm64 localhost:5002/multiarch-example:latest
+
+# Force running AMD64 version (will use emulation if needed)
+docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
+```
+
+The `--platform` flag tells Docker which version of the image to use:
+- `linux/arm64`: Uses native ARM64 version (best performance on Apple Silicon/ARM machines)
+- `linux/amd64`: Uses AMD64 version (might use emulation on ARM machines)
+
+If you don't specify a platform:
+1. Docker will try to use the image that matches your build platform
+2. This might not be optimal for your host architecture
+3. You'll see the warning message about platform mismatch
+
+### Platform Variables in Multi-Architecture Builds
+
+The Dockerfile uses two important platform-related variables:
+
+1. **$BUILDPLATFORM**:
+   - Represents the platform where the build is running
+   - Often defaults to AMD64 in buildx environments
+   - Used when you need to run build-time operations
+   - Example: `FROM --platform=$BUILDPLATFORM golang:1.21` for a build stage
+
+2. **$TARGETPLATFORM**:
+   - Represents the platform for which the image is being built
+   - Matches the actual target architecture (ARM64 or AMD64)
+   - Used for the runtime image
+   - Example: `FROM --platform=$TARGETPLATFORM python:3.11-slim` for the final stage
+   - This is actually the default behavior, so `--platform=$TARGETPLATFORM` is optional
+
+When using these variables:
+- Use `$BUILDPLATFORM` for build stages that need to run during image creation
+- Use `$TARGETPLATFORM` (or omit platform specification) for the final runtime stage
+- This ensures Docker selects the correct architecture by default when running the container
+
+For example, in our Dockerfile:
+```dockerfile
+# Build stages use specific platforms
+FROM --platform=linux/amd64 python:3.11-slim AS amd64_builder
+...
+FROM --platform=linux/arm64 python:3.11-slim AS arm64_builder
+...
+
+# Final stage uses TARGETPLATFORM (or no platform specification)
+FROM python:3.11-slim
+# This automatically matches the running platform
+```
+
+This setup ensures that:
+1. Build stages run on their specified platforms
+2. The final image automatically matches your host architecture
+3. No platform warning appears when running without `--platform` flag

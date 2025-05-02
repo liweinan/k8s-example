@@ -13,8 +13,11 @@ RUN echo "ARM64 specific build steps" > build.log
 RUN echo "Hello from ARM64!" > message.txt
 
 # Final stage: Combine results
-FROM --platform=$BUILDPLATFORM localhost:5002/python:3.11-slim
+FROM --platform=$TARGETPLATFORM localhost:5002/python:3.11-slim
 WORKDIR /app
+
+# Clean up any existing files first
+RUN rm -rf /app/*
 
 # Copy build artifacts from both architectures
 COPY --from=amd64_builder /build/arch.txt /app/amd64_arch.txt
@@ -26,8 +29,8 @@ COPY --from=arm64_builder /build/message.txt /app/arm64_message.txt
 COPY app.py .
 RUN chmod +x app.py
 
-# Clean up any potential leftover files
-RUN rm -f arch_info.py
+# Verify the contents of /app
+RUN ls -la /app
 
 # Set the entrypoint
 ENTRYPOINT ["./app.py"] 
