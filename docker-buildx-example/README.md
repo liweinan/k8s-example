@@ -15,13 +15,18 @@ graph TD
     end
     
     subgraph Build Process
-        D --> G[arm64 Image]
-        E --> H[amd64 Image]
+        D --> G[arm64 Image Layer]
+        E --> H[amd64 Image Layer]
+    end
+    
+    subgraph Multi-arch Image Structure
+        I[Image Manifest] --> J[arm64 Manifest]
+        I --> K[amd64 Manifest]
+        J --> G
+        K --> H
     end
     
     subgraph Output
-        G --> I[Multi-arch Image]
-        H --> I
         I --> B
     end
 ```
@@ -54,16 +59,54 @@ sequenceDiagram
     
     par arm64 build
         Buildx->>BuildArm64: Build native image
-        BuildArm64->>Buildx: Return arm64 image
+        BuildArm64->>Buildx: Return arm64 image layers
     and amd64 build
         Buildx->>BuildAmd64: Build amd64 image
         BuildAmd64->>QEMU: Use emulation
         QEMU->>BuildAmd64: Provide emulated environment
-        BuildAmd64->>Buildx: Return amd64 image
+        BuildAmd64->>Buildx: Return amd64 image layers
     end
     
-    Buildx->>LocalRegistry: Push multi-arch image
+    Buildx->>Buildx: Create manifest list
+    Buildx->>LocalRegistry: Push multi-arch image with manifest
 ```
+
+## Multi-Architecture Image Structure
+
+A multi-architecture Docker image is a single image that contains multiple architecture-specific images within it. Here's how it's structured:
+
+### Image Manifest List
+- A single manifest list (index) that points to multiple architecture-specific manifests
+- Each architecture-specific manifest points to its own set of layers
+- The manifest list contains metadata about which architecture each image supports
+
+### Example Structure
+```
+Multi-arch Image (single tag)
+├── Manifest List
+│   ├── linux/amd64 Manifest
+│   │   └── amd64 Image Layers
+│   └── linux/arm64 Manifest
+│       └── arm64 Image Layers
+```
+
+### Key Points
+1. **Single Tag**: All architectures are accessible through the same image tag
+2. **Automatic Selection**: Docker automatically selects the correct architecture when pulling/running
+3. **Efficient Storage**: Common layers are shared between architectures
+4. **Manifest List**: The top-level manifest contains references to all architecture-specific images
+
+### Verification
+You can inspect the structure of a multi-arch image using:
+```bash
+docker buildx imagetools inspect localhost:5002/multiarch-example:latest
+```
+
+This will show:
+- The manifest list digest
+- Individual manifests for each architecture
+- Platform information for each architecture
+- Layer information for each architecture
 
 ## Buildx Architecture Explained
 
