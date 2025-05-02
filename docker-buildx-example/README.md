@@ -24,19 +24,23 @@ graph TD
     end
     
     subgraph Build Process
-        D --> G[arm64 Image Layer]
-        E --> H[amd64 Image Layer]
+        D --> G[arm64 Image]
+        E --> H[amd64 Image]
+        G --> I[Multi-arch Image]
+        H --> I
     end
     
-    subgraph Multi-arch Image Structure
-        I[Image Manifest] --> J[arm64 Manifest]
-        I --> K[amd64 Manifest]
-        J --> G
-        K --> H
-    end
-    
-    subgraph Output
+    subgraph Image Storage
         I --> B
+        B --> J[arm64 Manifest]
+        B --> K[amd64 Manifest]
+        J --> L[arm64 Layers]
+        K --> M[amd64 Layers]
+    end
+    
+    subgraph Image Usage
+        B --> N[Pull arm64 Image]
+        B --> O[Pull amd64 Image]
     end
 ```
 
