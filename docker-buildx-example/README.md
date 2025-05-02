@@ -653,30 +653,33 @@ Note: You'll need to log out and back in for the group changes to take effect.
 
 1. **For AMD64/Intel Systems**:
    ```bash
-   # Pull the image (Docker will automatically select the AMD64 version)
-   docker pull weli/multiarch-example:latest
+   # Pull the AMD64-specific version
+   docker pull weli/multiarch-example:amd64
 
-   # Run the container
-   docker run --rm weli/multiarch-example:latest
+   # Run the AMD64 version
+   docker run --rm weli/multiarch-example:amd64
+
+   # Or use the platform flag to ensure AMD64
+   docker run --rm --platform linux/amd64 weli/multiarch-example:latest
    ```
 
 2. **For ARM64 Systems**:
    ```bash
-   # Pull the image (Docker will automatically select the ARM64 version)
-   docker pull weli/multiarch-example:latest
+   # Pull the ARM64-specific version
+   docker pull weli/multiarch-example:arm64
 
-   # Run the container
-   docker run --rm weli/multiarch-example:latest
-   ```
+   # Run the ARM64 version
+   docker run --rm weli/multiarch-example:arm64
 
-3. **Force Specific Architecture**:
-   ```bash
-   # Force AMD64 version (useful for testing)
-   docker run --rm --platform linux/amd64 weli/multiarch-example:latest
-
-   # Force ARM64 version (useful for testing)
+   # Or use the platform flag to ensure ARM64
    docker run --rm --platform linux/arm64 weli/multiarch-example:latest
    ```
+
+3. **Important Note About Architecture Selection**:
+   - The `latest` tag currently points to the ARM64 version
+   - Always use the architecture-specific tag (`amd64` or `arm64`) for your system
+   - If using `latest`, always specify the platform with `--platform` flag
+   - This ensures you get the correct architecture for your system
 
 ### Expected Output
 
@@ -711,13 +714,13 @@ Hello from ARM64!
    ```
 
 2. **Platform Mismatch**:
-   If you see platform mismatch warnings, explicitly specify the platform:
+   If you see platform mismatch warnings, use the architecture-specific tag:
    ```bash
    # For AMD64 systems
-   docker run --rm --platform linux/amd64 weli/multiarch-example:latest
+   docker run --rm weli/multiarch-example:amd64
    
    # For ARM64 systems
-   docker run --rm --platform linux/arm64 weli/multiarch-example:latest
+   docker run --rm weli/multiarch-example:arm64
    ```
 
 3. **Network Issues**:
