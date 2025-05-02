@@ -317,13 +317,41 @@ docker run --platform linux/arm64 multiarch-example:latest
 
 ## Step-by-Step Guide
 
-### Step 1: Setup Local Registry
+### Step 1: Setup Local Registry with Manifest Support
 
-Start a local registry for testing:
+1. Create a registry configuration file (`registry-config.yml`):
+```yaml
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /var/lib/registry
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+compatibility:
+  schema1:
+    enabled: true
+  manifest:
+    enabled: true
+    allow:
+      - application/vnd.docker.distribution.manifest.v2+json
+      - application/vnd.docker.distribution.manifest.list.v2+json
+      - application/vnd.oci.image.manifest.v1+json
+      - application/vnd.oci.image.index.v1+json
+```
 
+2. Start the registry with manifest support:
 ```bash
-# Start a local registry (using port 5002 as an example)
-docker run -d -p 5002:5000 --name registry registry:2
+# Start a local registry with manifest support (using port 5002)
+docker run -d -p 5002:5000 --name registry \
+    -v $(pwd)/registry-config.yml:/etc/docker/registry/config.yml \
+    registry:2
 ```
 
 ### Step 2: Setup Buildx Builder
@@ -343,13 +371,11 @@ Before building the multi-arch image, prepare architecture-specific base images 
 # Pull and tag AMD64 image
 docker pull --platform linux/amd64 python:3.11-slim
 docker tag python:3.11-slim localhost:5002/python:3.11-slim-amd64
+docker push localhost:5002/python:3.11-slim-amd64
 
 # Pull and tag ARM64 image
 docker pull --platform linux/arm64 python:3.11-slim
 docker tag python:3.11-slim localhost:5002/python:3.11-slim-arm64
-
-# Push to local registry
-docker push localhost:5002/python:3.11-slim-amd64
 docker push localhost:5002/python:3.11-slim-arm64
 ```
 
@@ -357,29 +383,33 @@ docker push localhost:5002/python:3.11-slim-arm64
 
 Build and push the multi-architecture image to your local registry:
 
+1. Build and push both architectures in a single command:
 ```bash
-# Build and push to local registry (with attestations disabled)
-docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push --provenance=false --sbom=false .
+# Build and push both architectures
+docker buildx build --platform linux/amd64,linux/arm64 \
+    -t localhost:5002/multiarch-example:latest \
+    --push --provenance=false --sbom=false .
+
+# Verify the manifest list was created
+docker buildx imagetools inspect localhost:5002/multiarch-example:latest
 ```
 
-Note: The `--provenance=false --sbom=false` flags disable the generation of attestation manifests. If you don't specify these flags, you might see an additional "unknown/unknown" platform manifest in the image inspection output, which is used for build attestations and SBOM (Software Bill of Materials).
+Note: The `--provenance=false --sbom=false` flags disable the generation of attestation manifests.
 
 ### Step 5: Verify the Build
 
 After pushing to the local registry, verify the multi-architecture image:
 
-1. Check the supported architectures:
+1. Test the image on different architectures:
 ```bash
-docker buildx imagetools inspect localhost:5002/multiarch-example:latest
-```
-
-2. Test the image on different architectures:
-```bash
-# Run on your native architecture (e.g., ARM64 for Apple Silicon)
+# Run on your native architecture
 docker run --rm localhost:5002/multiarch-example:latest
 
 # Run on AMD64 (will use emulation if not on AMD64 machine)
 docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
+
+# Run on ARM64 (will use emulation if not on ARM64 machine)
+docker run --rm --platform linux/arm64 localhost:5002/multiarch-example:latest
 ```
 
 The application will display:
@@ -388,18 +418,11 @@ The application will display:
 - Platform details
 - Build artifacts from both architectures
 
-Always test both architectures to ensure your multi-arch build is working correctly. Using the `--platform` flag ensures you're testing the specific architecture variant you intend to verify.
+### Step 6: Push to Docker Hub
 
-### Step 6: Manual Process to Push to Docker Hub
+After verifying the multi-arch image works in the local registry, push it to Docker Hub:
 
-Due to potential network issues with Buildx accessing Docker Hub directly, use this manual process:
-
-1. Pull the multi-arch image from local registry:
-```bash
-docker pull localhost:5002/multiarch-example:latest
-```
-
-2. Tag and push each architecture separately:
+1. Tag and push each architecture:
 ```bash
 # For ARM64
 docker pull --platform linux/arm64 localhost:5002/multiarch-example:latest
@@ -410,23 +433,26 @@ docker push weli/multiarch-example:arm64
 docker pull --platform linux/amd64 localhost:5002/multiarch-example:latest
 docker tag localhost:5002/multiarch-example:latest weli/multiarch-example:amd64
 docker push weli/multiarch-example:amd64
-
-# Update the latest tag to point to the current architecture
-docker tag weli/multiarch-example:$(uname -m) weli/multiarch-example:latest
-docker push weli/multiarch-example:latest
 ```
 
-3. Verify the images on Docker Hub:
+2. Create a manifest list in Docker Hub:
 ```bash
-# Verify ARM64
-docker pull --platform linux/arm64 weli/multiarch-example:arm64
+# Create a manifest list that points to both architectures
+docker manifest create weli/multiarch-example:latest \
+    --amend weli/multiarch-example:amd64 \
+    --amend weli/multiarch-example:arm64
 
-# Verify AMD64
-docker pull --platform linux/amd64 weli/multiarch-example:amd64
-
-# Verify latest tag
-docker pull weli/multiarch-example:latest
+# Push the manifest list
+docker manifest push weli/multiarch-example:latest
 ```
+
+3. Verify the manifest list:
+```bash
+# Check the manifest list
+docker manifest inspect weli/multiarch-example:latest
+```
+
+Now, when users pull either `localhost:5002/multiarch-example:latest` or `weli/multiarch-example:latest`, Docker will automatically select the correct architecture based on their host platform.
 
 ### Step 7: Cleanup
 
@@ -439,6 +465,9 @@ docker buildx rm mybuilder
 # Stop and remove the local registry
 docker stop registry
 docker rm registry
+
+# Remove the registry configuration
+rm registry-config.yml
 ```
 
 ## Troubleshooting
