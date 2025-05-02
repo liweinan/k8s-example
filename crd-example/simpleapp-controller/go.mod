@@ -1,6 +1,8 @@
 module simpleapp-controller
 
-go 1.20
+go 1.21
+
+toolchain go1.24.2
 
 require (
 	k8s.io/apimachinery v0.29.0
