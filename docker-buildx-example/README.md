@@ -108,12 +108,25 @@ docker buildx create --use --name mybuilder --driver docker-container --driver-o
 
 ### 2. Build and Push to Local Registry
 
-First, build and push the multi-architecture image to your local registry:
+First, we need to prepare the base image in the local registry:
 
 ```bash
-# Build and push to local registry
-docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push .
+# Pull the Python slim image
+docker pull python:3.11-slim
+
+# Tag and push it to the local registry
+docker tag python:3.11-slim localhost:5002/python:3.11-slim
+docker push localhost:5002/python:3.11-slim
 ```
+
+Now, build and push the multi-architecture image to your local registry:
+
+```bash
+# Build and push to local registry (with attestations disabled)
+docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push --provenance=false --sbom=false .
+```
+
+Note: The `--provenance=false --sbom=false` flags disable the generation of attestation manifests. If you don't specify these flags, you might see an additional "unknown/unknown" platform manifest in the image inspection output, which is used for build attestations and SBOM (Software Bill of Materials).
 
 ### 3. Verify the Build
 
@@ -195,6 +208,39 @@ Key points:
 - The application is copied and made executable
 - The entrypoint is set to run the application
 
+### Architecture Compatibility
+
+| Host Architecture | Compatible Variants |
+|------------------|---------------------|
+| arm64            | arm64/v8, arm64     |
+| amd64            | amd64, x86_64       |
+| arm/v7           | arm/v7, arm32       |
+
+## Troubleshooting
+
+If you encounter network issues when pushing directly to Docker Hub with Buildx, use the manual process described above. This approach:
+1. Builds the multi-arch image locally
+2. Pushes to a local registry
+3. Manually tags and pushes each architecture to Docker Hub
+4. Verifies the images can be pulled for each architecture
+
+## Cleanup
+
+To remove the Buildx builder:
+```bash
+docker buildx rm mybuilder
+```
+
+To stop and remove the local registry:
+```bash
+docker stop registry
+docker rm registry
+```
+
+## License
+
+MIT
+
 ## Architecture Selection Process
 
 When pulling and running a multi-architecture image, Docker automatically selects the appropriate architecture based on several factors:
@@ -242,36 +288,3 @@ docker run --platform linux/amd64 multiarch-example:latest
 # Force using arm64 architecture
 docker run --platform linux/arm64 multiarch-example:latest
 ```
-
-### Architecture Compatibility
-
-| Host Architecture | Compatible Variants |
-|------------------|---------------------|
-| arm64            | arm64/v8, arm64     |
-| amd64            | amd64, x86_64       |
-| arm/v7           | arm/v7, arm32       |
-
-## Troubleshooting
-
-If you encounter network issues when pushing directly to Docker Hub with Buildx, use the manual process described above. This approach:
-1. Builds the multi-arch image locally
-2. Pushes to a local registry
-3. Manually tags and pushes each architecture to Docker Hub
-4. Verifies the images can be pulled for each architecture
-
-## Cleanup
-
-To remove the Buildx builder:
-```bash
-docker buildx rm mybuilder
-```
-
-To stop and remove the local registry:
-```bash
-docker stop registry
-docker rm registry
-```
-
-## License
-
-MIT 
