@@ -466,10 +466,6 @@ This warning is expected when building multi-architecture images and can be safe
    - Tag and push base images to local registry first
    - Test images locally before pushing to Docker Hub
 
-## License
-
-MIT
-
 ### Platform Selection Warning
 
 When running multi-architecture images, you might see a warning like:
