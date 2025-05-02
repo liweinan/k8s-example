@@ -216,6 +216,54 @@ ENTRYPOINT ["./app.py"]
    - Verifies file contents with directory listing
    - Maintains proper file permissions
 
+---
+
+这三行的含义以及最后一行 `FROM final_$TARGETARCH` 的作用如下：
+
+### 三行代码的含义
+```dockerfile
+# Final stage: Combine results
+FROM localhost:5002/python:3.11-slim-amd64 AS final_amd64
+FROM localhost:5002/python:3.11-slim-arm64 AS final_arm64
+FROM final_$TARGETARCH
+```
+
+1. **`FROM localhost:5002/python:3.11-slim-amd64 AS final_amd64`**
+   - 定义了一个名为 `final_amd64` 的构建阶段，基于 `localhost:5002/python:3.11-slim-amd64` 镜像，用于 AMD64 架构的最终镜像。
+   - 这一阶段为 AMD64 架构准备了一个基础镜像。
+
+2. **`FROM localhost:5002/python:3.11-slim-arm64 AS final_arm64`**
+   - 定义了一个名为 `final_arm64` 的构建阶段，基于 `localhost:5002/python:3.11-slim-arm64` 镜像，用于 ARM64 架构的最终镜像。
+   - 这一阶段为 ARM64 架构准备了一个基础镜像。
+
+3. **`FROM final_$TARGETARCH`**
+   - 这一行使用了 Docker 构建时的架构变量 `$TARGETARCH`，动态选择最终镜像的基础阶段（`final_amd64` 或 `final_arm64`）。
+   - `$TARGETARCH` 是一个在构建多架构镜像时由 Docker 自动设置的环境变量，表示目标架构（例如 `amd64` 或 `arm64`）。
+   - 根据构建时的目标架构，Docker 会将 `final_$TARGETARCH` 解析为 `final_amd64` 或 `final_arm64`，从而选择对应的基础镜像。
+
+### 为什么需要最后一行 `FROM final_$TARGETARCH`？
+最后一行是实现 **多架构支持** 的关键。以下是具体原因：
+
+1. **动态选择架构**：
+   - Docker 的多架构构建（multi-architecture build）需要在同一个 Dockerfile 中支持不同的硬件架构（例如 AMD64 和 ARM64）。
+   - 通过 `final_amd64` 和 `final_arm64` 定义了两个架构特定的构建阶段，但最终镜像需要根据目标平台动态选择其中一个。
+   - `FROM final_$TARGETARCH` 使用 `$TARGETARCH` 变量来动态选择正确的阶段（`final_amd64` 或 `final_arm64`），确保最终镜像基于目标架构的正确基础镜像。
+
+2. **支持 Docker BuildKit 的多架构构建**：
+   - 当使用 Docker BuildKit（默认在现代 Docker 版本中启用）进行构建时，`--platform` 参数可以指定多个目标架构（例如 `linux/amd64,linux/arm64`）。
+   - `$TARGETARCH` 变量会根据 `--platform` 的值自动设置为 `amd64` 或 `arm64`，从而让 Dockerfile 在构建时自动适配目标架构。
+   - 没有 `FROM final_$TARGETARCH`，Docker 无法动态选择正确的最终镜像，导致无法生成多架构镜像。
+
+3. **简化 Dockerfile 的逻辑**：
+   - 直接使用 `FROM final_$TARGETARCH` 避免了为每种架构编写单独的 Dockerfile 或使用复杂的条件逻辑。
+   - 它将架构选择交给 Docker 的构建系统，保持 Dockerfile 的简洁性和可维护性。
+
+### 总结
+- 这三行代码通过定义两个架构特定的最终阶段（`final_amd64` 和 `final_arm64`）并使用 `FROM final_$TARGETARCH` 来动态选择正确的阶段，实现了多架构镜像的构建。
+- 最后一行 `FROM final_$TARGETARCH` 是必需的，因为它通过 `$TARGETARCH` 变量动态选择目标架构的基础镜像，确保构建的镜像与目标平台兼容。这是多架构 Dockerfile 的常见模式，特别是在使用 Docker BuildKit 构建多平台镜像时。
+
+---
+
 ### Best Practices to Minimize Warnings
 
 1. **Base Image Handling**:
