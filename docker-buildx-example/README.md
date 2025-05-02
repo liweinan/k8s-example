@@ -262,3 +262,73 @@ docker rm registry
 - The Dockerfile uses `--platform=$BUILDPLATFORM` to ensure proper multi-architecture support
 - The image is based on Python 3.11 slim for a smaller footprint
 - Using a local registry is helpful for testing without pushing to public registries 
+
+## Architecture Selection Process
+
+When pulling and running a multi-architecture image, Docker automatically selects the appropriate architecture based on several factors:
+
+### Automatic Architecture Selection
+
+1. **Host Architecture Detection**
+   ```mermaid
+   sequenceDiagram
+       participant User
+       participant Docker
+       participant Registry
+       participant Host
+       
+       User->>Docker: docker pull multiarch-example:latest
+       Docker->>Host: Detect system architecture
+       Host-->>Docker: Return architecture (e.g., arm64)
+       Docker->>Registry: Request manifest list
+       Registry-->>Docker: Return manifest list
+       Docker->>Docker: Match host architecture to manifest
+       Docker->>Registry: Pull matching architecture image
+       Registry-->>Docker: Return architecture-specific image
+   ```
+
+2. **Selection Process**
+   - Docker first detects the host system's architecture
+   - When pulling an image, it requests the manifest list
+   - The manifest list contains all available architectures
+   - Docker matches the host architecture with the available options
+   - The matching architecture-specific image is pulled
+
+3. **Fallback Behavior**
+   - If exact architecture match isn't found, Docker looks for compatible variants
+   - Example: `arm64` might use `arm64/v8` if available
+   - If no compatible architecture is found, pull fails
+
+### Manual Architecture Selection
+
+You can override the automatic selection using the `--platform` flag:
+
+```bash
+# Force using amd64 architecture
+docker run --platform linux/amd64 multiarch-example:latest
+
+# Force using arm64 architecture
+docker run --platform linux/arm64 multiarch-example:latest
+```
+
+### Architecture Compatibility
+
+| Host Architecture | Compatible Variants |
+|------------------|---------------------|
+| arm64            | arm64/v8, arm64     |
+| amd64            | amd64, x86_64       |
+| arm/v7           | arm/v7, arm32       |
+
+### Verification
+
+You can check which architecture is being used:
+
+```bash
+# Check image architecture
+docker inspect --format='{{.Architecture}}' multiarch-example:latest
+
+# Run and check architecture
+docker run --rm multiarch-example:latest
+```
+
+The output will show the actual architecture being used. 
