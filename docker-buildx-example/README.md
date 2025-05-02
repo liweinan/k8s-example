@@ -9,19 +9,20 @@ graph TD
     subgraph Host Machine
         A[Docker Daemon] --> B[Local Registry]
         A --> C[Buildx Builder Container]
-        C --> D[QEMU Emulation]
+        C --> D[Build Container arm64]
+        C --> E[Build Container amd64]
+        E --> F[QEMU Container]
     end
     
     subgraph Build Process
-        C --> E[Build for arm64]
-        C --> F[Build for amd64]
-        D --> F
+        D --> G[arm64 Image]
+        E --> H[amd64 Image]
     end
     
     subgraph Output
-        E --> G[Multi-arch Image]
-        F --> G
-        G --> B
+        G --> I[Multi-arch Image]
+        H --> I
+        I --> B
     end
 ```
 
@@ -33,6 +34,8 @@ sequenceDiagram
     participant Docker
     participant LocalRegistry
     participant Buildx
+    participant BuildArm64
+    participant BuildAmd64
     participant QEMU
     
     User->>Docker: docker login
@@ -42,19 +45,73 @@ sequenceDiagram
     
     User->>Docker: docker buildx create
     Docker->>Buildx: Create builder container
+    Buildx->>BuildArm64: Create arm64 build container
+    Buildx->>BuildAmd64: Create amd64 build container
+    BuildAmd64->>QEMU: Create QEMU container
     
     User->>Docker: docker buildx build
     Docker->>Buildx: Start build process
     
-    alt arm64 build
-        Buildx->>Buildx: Native build
-    else amd64 build
-        Buildx->>QEMU: Request emulation
-        QEMU->>Buildx: Provide emulated environment
+    par arm64 build
+        Buildx->>BuildArm64: Build native image
+        BuildArm64->>Buildx: Return arm64 image
+    and amd64 build
+        Buildx->>BuildAmd64: Build amd64 image
+        BuildAmd64->>QEMU: Use emulation
+        QEMU->>BuildAmd64: Provide emulated environment
+        BuildAmd64->>Buildx: Return amd64 image
     end
     
     Buildx->>LocalRegistry: Push multi-arch image
 ```
+
+## Buildx Architecture Explained
+
+Docker Buildx uses a multi-container architecture to handle multi-architecture builds. Here's a detailed breakdown:
+
+### Components
+
+1. **Buildx Builder Container**
+   - The main container that orchestrates the build process
+   - Manages the creation and coordination of other containers
+   - Handles the final assembly of the multi-architecture image
+
+2. **Build Containers**
+   - Separate containers created for each target architecture
+   - Each build container is specialized for its target architecture
+   - Run in parallel to maximize build efficiency
+   - Example: When building for `linux/amd64` and `linux/arm64`, two separate build containers are created
+
+3. **QEMU Containers**
+   - Created only for non-native architectures
+   - Provide emulation capabilities for cross-architecture builds
+   - Example: When building `amd64` on an `arm64` machine, a QEMU container is created to handle the emulation
+
+### Build Process
+
+1. **Initialization**
+   - The Buildx builder container is created
+   - Build containers are spawned for each target architecture
+   - QEMU containers are created as needed for emulation
+
+2. **Parallel Building**
+   - Each build container works independently
+   - Native architecture builds run directly
+   - Non-native architecture builds use QEMU emulation
+   - Builds proceed in parallel for efficiency
+
+3. **Image Assembly**
+   - Individual architecture-specific images are combined
+   - A manifest list is created to support multiple architectures
+   - The final multi-architecture image is pushed to the registry
+
+### Benefits of This Architecture
+
+- **Parallelization**: Multiple architectures can be built simultaneously
+- **Isolation**: Each build runs in its own container, preventing conflicts
+- **Efficiency**: Native builds don't require emulation
+- **Flexibility**: Easy to add support for new architectures
+- **Reliability**: Issues in one build don't affect others
 
 ## Prerequisites
 
