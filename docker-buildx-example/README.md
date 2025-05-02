@@ -402,11 +402,66 @@ docker rm registry
 
 ## Troubleshooting
 
-If you encounter network issues when pushing directly to Docker Hub with Buildx, use the manual process described in Step 6. This approach:
-1. Builds the multi-arch image locally
-2. Pushes to a local registry
-3. Manually tags and pushes each architecture to Docker Hub
-4. Verifies the images can be pulled for each architecture
+### Build Cache Issues
+
+If you encounter issues with stale artifacts or unexpected files in your image, it might be due to the build cache. Here's how to resolve such issues:
+
+1. Clean the buildx cache:
+   ```bash
+   # Remove all buildx cache
+   docker buildx prune -f
+   ```
+
+2. Rebuild without using cache:
+   ```bash
+   # Build with --no-cache flag
+   docker buildx build --no-cache --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push .
+   ```
+
+3. Clean up local images and pull fresh:
+   ```bash
+   # Remove local image
+   docker rmi -f localhost:5002/multiarch-example:latest
+   
+   # Pull fresh image
+   docker pull localhost:5002/multiarch-example:latest
+   ```
+
+### Network Issues
+
+If you encounter network issues when pushing directly to Docker Hub with Buildx, use this manual process:
+1. Build the multi-arch image locally
+2. Push to a local registry
+3. Manually tag and push each architecture to Docker Hub
+4. Verify the images can be pulled for each architecture
+
+### Platform Mismatch Warnings
+
+You might see warnings like:
+```
+WARN: InvalidBaseImagePlatform: Base image was pulled with platform "linux/arm64", expected "linux/amd64"
+```
+This warning is expected when building multi-architecture images and can be safely ignored if:
+1. You're using a local registry
+2. The final image works correctly on all target platforms
+3. The build completes successfully
+
+## Best Practices
+
+1. **Clean Builds**:
+   - Use `--no-cache` when troubleshooting build issues
+   - Regularly clean buildx cache with `docker buildx prune`
+   - Remove local images before testing fresh builds
+
+2. **Image Verification**:
+   - Always test images on all target architectures
+   - Verify the contents and behavior of the final image
+   - Check for any unexpected files or artifacts
+
+3. **Local Registry Usage**:
+   - Use a local registry for faster development and testing
+   - Tag and push base images to local registry first
+   - Test images locally before pushing to Docker Hub
 
 ## License
 
