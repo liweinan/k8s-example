@@ -21,6 +21,7 @@ graph TD
         C --> D[Build Container arm64]
         C --> E[Build Container amd64]
         E --> F[QEMU Container]
+        F --> E
     end
     
     subgraph Build Process
@@ -42,7 +43,64 @@ graph TD
         B --> N[Pull arm64 Image]
         B --> O[Pull amd64 Image]
     end
+
+    style F fill:#f9f,stroke:#333,stroke-width:2px
 ```
+
+Note: The QEMU container (highlighted in pink) is only created when building for non-native architectures. For example, when building an amd64 image on an arm64 machine, the QEMU container provides the necessary emulation environment.
+
+### How QEMU Emulation Works
+
+When building an AMD64 image on an ARM64 machine, the process works as follows:
+
+1. **Binary Format Registration**:
+   - The QEMU container registers binary formats in the host's `/proc/sys/fs/binfmt_misc/`
+   - This tells the kernel how to handle AMD64 binaries on ARM64
+
+2. **Build Process**:
+   - The AMD64 build container provides a complete AMD64 environment
+   - It manages the build context, layers, and Dockerfile instructions
+   - When AMD64 binaries need to be executed:
+     - The kernel intercepts the execution
+     - Forwards it to QEMU in the QEMU container
+     - QEMU emulates the AMD64 environment and executes the binaries
+     - Results are returned to the build container
+
+3. **Why Two Containers?**
+   - **AMD64 Build Container**:
+     - Provides a complete AMD64 environment
+     - Manages build context and layers
+     - Handles Dockerfile instructions
+     - Maintains correct file system structure
+     - Manages build dependencies and tools
+   
+   - **QEMU Container**:
+     - Provides CPU emulation
+     - Handles binary execution
+     - Manages system call translation
+     - Does not manage build environment
+
+4. **Example Flow**:
+   ```mermaid
+   sequenceDiagram
+       participant Build as AMD64 Build Container
+       participant Kernel as Host Kernel
+       participant QEMU as QEMU Container
+       
+       Build->>Kernel: Execute AMD64 binary
+       Note over Build,Kernel: Build container manages environment
+       Kernel->>QEMU: Forward execution
+       QEMU->>QEMU: Emulate AMD64 environment
+       QEMU->>Kernel: Return results
+       Kernel->>Build: Return execution results
+       Note over Build,Kernel: Build container continues build process
+   ```
+
+This separation of concerns allows:
+- The build container to focus on managing the build environment and process
+- The QEMU container to focus on CPU emulation
+- Better isolation and reliability of the build process
+- Proper handling of architecture-specific build requirements
 
 ## Build Process Flow
 
