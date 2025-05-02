@@ -435,7 +435,7 @@ docker tag localhost:5002/multiarch-example:latest weli/multiarch-example:amd64
 docker push weli/multiarch-example:amd64
 ```
 
-2. Create a manifest list in Docker Hub:
+2. Create and push the manifest list:
 ```bash
 # Create a manifest list that points to both architectures
 docker manifest create weli/multiarch-example:latest \
