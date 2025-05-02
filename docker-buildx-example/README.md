@@ -2,6 +2,60 @@
 
 This is a simple example demonstrating how to build Docker images for multiple architectures using Docker Buildx.
 
+## Architecture Overview
+
+```mermaid
+graph TD
+    subgraph Host Machine
+        A[Docker Daemon] --> B[Local Registry]
+        A --> C[Buildx Builder Container]
+        C --> D[QEMU Emulation]
+    end
+    
+    subgraph Build Process
+        C --> E[Build for arm64]
+        C --> F[Build for amd64]
+        D --> F
+    end
+    
+    subgraph Output
+        E --> G[Multi-arch Image]
+        F --> G
+        G --> B
+    end
+```
+
+## Build Process Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Docker
+    participant LocalRegistry
+    participant Buildx
+    participant QEMU
+    
+    User->>Docker: docker login
+    User->>Docker: docker pull python:3.11-slim
+    User->>Docker: docker tag & push base image
+    Docker->>LocalRegistry: Store base image
+    
+    User->>Docker: docker buildx create
+    Docker->>Buildx: Create builder container
+    
+    User->>Docker: docker buildx build
+    Docker->>Buildx: Start build process
+    
+    alt arm64 build
+        Buildx->>Buildx: Native build
+    else amd64 build
+        Buildx->>QEMU: Request emulation
+        QEMU->>Buildx: Provide emulated environment
+    end
+    
+    Buildx->>LocalRegistry: Push multi-arch image
+```
+
 ## Prerequisites
 
 - Docker Desktop installed (with Buildx support)
