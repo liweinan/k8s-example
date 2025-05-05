@@ -327,7 +327,7 @@ if [ "$SKIP_SETUP" = false ]; then
         docker exec "$CONTAINER_NAME" sh -c "echo '$HOST_IP host.docker.internal' >> /etc/hosts"
         
         # Set proxy settings with IPv4 preference
-        docker exec "$CONTAINER_NAME" sh -c "
+        docker exec "$CONTAINER_NAME" sh -c '
             # Clear any existing proxy settings
             unset http_proxy
             unset https_proxy
@@ -337,27 +337,27 @@ if [ "$SKIP_SETUP" = false ]; then
             unset NO_PROXY
             
             # Set new proxy settings
-            export http_proxy=\"$CONTAINER_PROXY_URL\"
-            export https_proxy=\"$CONTAINER_PROXY_URL\"
-            export HTTP_PROXY=\"$CONTAINER_PROXY_URL\"
-            export HTTPS_PROXY=\"$CONTAINER_PROXY_URL\"
-            export no_proxy=\"localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal\"
-            export NO_PROXY=\"localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal\"
+            export http_proxy="'"$CONTAINER_PROXY_URL"'"
+            export https_proxy="'"$CONTAINER_PROXY_URL"'"
+            export HTTP_PROXY="'"$CONTAINER_PROXY_URL"'"
+            export HTTPS_PROXY="'"$CONTAINER_PROXY_URL"'"
+            export no_proxy="localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal"
+            export NO_PROXY="localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal"
             
             # Force IPv4 for wget
-            echo 'prefer-family = IPv4' > /etc/wgetrc
+            echo "prefer-family = IPv4" > /etc/wgetrc
             
             # Configure Go proxy settings through environment variables
-            export GOPROXY=\"https://goproxy.cn,direct\"
-            export GONOSUMDB=\"*\"
-            export GONOPROXY=\"*\"
-            export GOINSECURE=\"*\"
-            export GOPRIVATE=\"*\"
+            export GOPROXY="https://goproxy.cn,direct"
+            export GONOSUMDB="*"
+            export GONOPROXY="*"
+            export GOINSECURE="*"
+            export GOPRIVATE="*"
             
             # Print current environment for debugging
-            echo \"=== Current environment ===\"
+            echo "=== Current environment ==="
             env | grep -i proxy
-        "
+        '
     else
         BUILDX_ARGS+=(
             --driver-opt env.http_proxy=""
