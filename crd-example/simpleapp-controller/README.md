@@ -78,8 +78,20 @@ The project includes a `build-local.sh` script that handles the build process wi
 # Make the script executable
 chmod +x build-local.sh
 
-# Run the build script
+# Basic usage
 ./build-local.sh
+
+# With DockerHub push enabled
+./build-local.sh --push-to-dockerhub
+
+# With proxy settings
+./build-local.sh --proxy=http://localhost:7890
+
+# With both DockerHub push and proxy settings
+./build-local.sh --push-to-dockerhub --proxy=http://localhost:7890
+
+# Disable proxy
+./build-local.sh --no-proxy
 ```
 
 The build script:
@@ -88,11 +100,10 @@ The build script:
 - Builds and pushes multi-arch images
 - Cleans up resources after build
 
-To configure proxy settings, edit the script:
-```bash
-USE_PROXY=true  # Set to false to disable proxy
-PROXY_URL="http://host.docker.internal:7890"  # Update with your proxy URL
-```
+Available options:
+- `--push-to-dockerhub`: Push the built image to DockerHub
+- `--proxy=URL`: Set proxy URL for build process (e.g., `--proxy=http://localhost:7890`)
+- `--no-proxy`: Disable proxy usage
 
 #### Manual Build Process
 
