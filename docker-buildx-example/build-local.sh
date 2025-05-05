@@ -10,6 +10,10 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Get host IP
+HOST_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
+echo -e "${YELLOW}Using host IP: $HOST_IP${NC}"
+
 # Function to check if registry is ready
 check_registry() {
     echo -e "${BLUE}Waiting for registry to be ready...${NC}"
@@ -29,7 +33,7 @@ check_registry() {
         docker logs registry --tail 10
         
         # Check registry health endpoint
-        if curl -s http://localhost:5002/v2/ > /dev/null; then
+        if curl -s http://$HOST_IP:5002/v2/ > /dev/null; then
             echo -e "${GREEN}Registry is ready!${NC}"
             return 0
         fi
@@ -48,7 +52,7 @@ verify_base_images() {
     local images=("python:3.11-slim-arm64" "python:3.11-slim-amd64")
     for image in "${images[@]}"; do
         echo -e "${YELLOW}Checking $image...${NC}"
-        if ! curl -s http://localhost:5002/v2/python/manifests/$(echo $image | cut -d: -f2) > /dev/null; then
+        if ! curl -s http://$HOST_IP:5002/v2/python/manifests/$(echo $image | cut -d: -f2) > /dev/null; then
             echo -e "${RED}Failed to verify $image in registry${NC}"
             return 1
         fi
@@ -98,14 +102,14 @@ echo -e "${BLUE}Pulling and pushing Python base images...${NC}"
 # For ARM64
 echo -e "${BLUE}Handling ARM64 base image...${NC}"
 docker pull --platform linux/arm64 python:3.11-slim
-docker tag python:3.11-slim localhost:5002/python:3.11-slim-arm64
-docker push localhost:5002/python:3.11-slim-arm64
+docker tag python:3.11-slim $HOST_IP:5002/python:3.11-slim-arm64
+docker push $HOST_IP:5002/python:3.11-slim-arm64
 
 # For AMD64
 echo -e "${BLUE}Handling AMD64 base image...${NC}"
 docker pull --platform linux/amd64 python:3.11-slim
-docker tag python:3.11-slim localhost:5002/python:3.11-slim-amd64
-docker push localhost:5002/python:3.11-slim-amd64
+docker tag python:3.11-slim $HOST_IP:5002/python:3.11-slim-amd64
+docker push $HOST_IP:5002/python:3.11-slim-amd64
 
 # Verify base images are in registry
 verify_base_images || exit 1
@@ -122,24 +126,24 @@ docker buildx inspect --bootstrap
 # Step 5: Build and push to local registry
 echo -e "${GREEN}Step 5: Building and pushing to local registry...${NC}"
 echo -e "${YELLOW}Build command:${NC}"
-echo "docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push --provenance=false --sbom=false ."
+echo "docker buildx build --platform linux/amd64,linux/arm64 -t $HOST_IP:5002/multiarch-example:latest --push --provenance=false --sbom=false ."
 docker buildx build --platform linux/amd64,linux/arm64 \
-    -t localhost:5002/multiarch-example:latest \
+    -t $HOST_IP:5002/multiarch-example:latest \
     --push --provenance=false --sbom=false .
 
 # Step 6: Verify the build
 echo -e "${GREEN}Step 6: Verifying the build...${NC}"
 echo -e "${BLUE}Inspecting manifest list:${NC}"
-docker buildx imagetools inspect localhost:5002/multiarch-example:latest
+docker buildx imagetools inspect $HOST_IP:5002/multiarch-example:latest
 
 echo -e "${BLUE}Testing on native architecture:${NC}"
-docker run --rm localhost:5002/multiarch-example:latest
+docker run --rm $HOST_IP:5002/multiarch-example:latest
 
 echo -e "${BLUE}Testing on AMD64:${NC}"
-docker run --rm --platform linux/amd64 localhost:5002/multiarch-example:latest
+docker run --rm --platform linux/amd64 $HOST_IP:5002/multiarch-example:latest
 
 echo -e "${BLUE}Testing on ARM64:${NC}"
-docker run --rm --platform linux/arm64 localhost:5002/multiarch-example:latest
+docker run --rm --platform linux/arm64 $HOST_IP:5002/multiarch-example:latest
 
 echo -e "${GREEN}Local build process completed successfully!${NC}"
 echo -e "${BLUE}You can now push to Docker Hub using the instructions in README.md${NC}" 
