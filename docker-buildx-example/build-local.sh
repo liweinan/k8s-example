@@ -45,9 +45,15 @@ check_registry_health() {
 
 echo -e "${BLUE}Starting local build process...${NC}"
 
-# Clean up any existing containers
+# Clean up any existing containers and builders
 echo -e "${YELLOW}Cleaning up...${NC}"
 docker rm -f registry 2>/dev/null || true
+docker buildx rm multiarch-builder 2>/dev/null || true
+
+# Create and use a new builder
+echo -e "${YELLOW}Creating new builder...${NC}"
+docker buildx create --name multiarch-builder --driver docker-container --bootstrap
+docker buildx use multiarch-builder
 
 # Step 1: Start local registry
 echo -e "${YELLOW}Step 1: Starting local registry...${NC}"
@@ -95,6 +101,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/app:lat
 # Step 4: Clean up
 echo -e "${YELLOW}Step 4: Cleaning up...${NC}"
 docker rm -f registry
+docker buildx rm multiarch-builder
 
 echo -e "${GREEN}Build process completed successfully!${NC}"
 echo -e "${GREEN}Image available at: localhost:5002/app:latest${NC}" 
