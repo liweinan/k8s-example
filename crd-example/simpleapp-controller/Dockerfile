@@ -1,69 +1,58 @@
-# Multi-stage build for creating a multi-architecture container image
+# syntax=docker/dockerfile:1.4
+FROM --platform=$BUILDPLATFORM localhost:5002/golang:1.21-${TARGETARCH} AS deps
 
-# Global build arguments
-ARG BASE_IMAGE=localhost:5002/golang:1.21-amd64
 ARG TARGETARCH
-ARG DISTROLESS_IMAGE=localhost:5002/distroless-static:nonroot-${TARGETARCH}
+ARG CONTAINER_PROXY_URL
+ENV http_proxy=${CONTAINER_PROXY_URL}
+ENV https_proxy=${CONTAINER_PROXY_URL}
+ENV HTTP_PROXY=${CONTAINER_PROXY_URL}
+ENV HTTPS_PROXY=${CONTAINER_PROXY_URL}
 
-# Stage 1: Dependencies - Downloads Go module dependencies
-FROM ${BASE_IMAGE} AS deps
+# Configure wget to prefer IPv4 and add retry logic
+RUN echo 'prefer-family = IPv4' > /etc/wgetrc && \
+    echo 'tries = 3' >> /etc/wgetrc && \
+    echo 'timeout = 10' >> /etc/wgetrc && \
+    echo "use_proxy = yes" >> /etc/wgetrc && \
+    echo "http_proxy = ${CONTAINER_PROXY_URL}" >> /etc/wgetrc && \
+    echo "https_proxy = ${CONTAINER_PROXY_URL}" >> /etc/wgetrc && \
+    echo "no_proxy = localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal" >> /etc/wgetrc
+
+# Print proxy environment for debugging
+RUN echo "=== [deps] Proxy env ===" && env | grep -i proxy
+RUN echo "=== [deps] Go env ===" && go env | grep -i proxy
+
+# Test outbound connectivity with retries
+RUN echo "=== [deps] Test outbound ===" && \
+    echo "Using proxy: ${CONTAINER_PROXY_URL}" && \
+    echo "Testing proxy connection..." && \
+    for i in $(seq 1 3); do \
+        echo "Attempt $i: Testing connection to auth.docker.io..." && \
+        if wget -O- https://auth.docker.io/token; then \
+            echo "Connection successful" && \
+            exit 0; \
+        else \
+            echo "Connection attempt $i failed, retrying in 2 seconds..." && \
+            sleep 2; \
+        fi; \
+    done && \
+    echo "All connection attempts failed" && \
+    exit 1
+
 WORKDIR /app
 
-# Add host.docker.internal to hosts file for proxy access
-RUN echo "$(getent hosts host.docker.internal | awk '{ print $1 }') host.docker.internal" >> /etc/hosts || true
-
-# Force IPv4 for wget
-RUN echo 'prefer-family = IPv4' > /etc/wgetrc
-
-# Proxy debug
-ARG http_proxy
-ARG https_proxy
-RUN echo "=== [deps] Proxy env ===" && env | grep -i proxy || true
-RUN echo "=== [deps] Test outbound ===" && wget -O- https://auth.docker.io/token || true
-
+# Download Go modules
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
-# Stage 2: Builder - Compiles the Go binary
-FROM ${BASE_IMAGE} AS builder
-WORKDIR /app
-
-# Add host.docker.internal to hosts file for proxy access
-RUN echo "$(getent hosts host.docker.internal | awk '{ print $1 }') host.docker.internal" >> /etc/hosts || true
-
-# Force IPv4 for wget
-RUN echo 'prefer-family = IPv4' > /etc/wgetrc
-
-# Proxy debug
-ARG http_proxy
-ARG https_proxy
-RUN echo "=== [builder] Proxy env ===" && env | grep -i proxy || true
-RUN echo "=== [builder] Test outbound ===" && wget -O- https://auth.docker.io/token || true
-
-# Copy downloaded dependencies from the deps stage
-COPY --from=deps /go/pkg/mod /go/pkg/mod
+# Build the Go binary
+FROM deps AS builder
 COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o /app/simpleapp-controller
 
-# Build arguments for cross-compilation
-ARG TARGETOS=linux
-ARG TARGETARCH
-
-# Build the binary with CGO disabled for better compatibility
-# GOOS and GOARCH are set based on the target platform
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o simpleapp-controller .
-
-# Stage 3: Final - Creates the minimal production image
-# Using distroless base image for security and minimal size
-FROM ${DISTROLESS_IMAGE}
-WORKDIR /
-
-# (Optional) Proxy debug in final image, usually not needed
-# RUN echo "=== [final] Proxy env ===" && env | grep -i proxy || true
-
-# Copy the compiled binary from the builder stage
-COPY --from=builder /app/simpleapp-controller .
-
-# Run as non-root user for security
-USER 65532:65532
-
+# Create minimal runtime image
+FROM --platform=$TARGETPLATFORM localhost:5002/distroless-static:nonroot-${TARGETARCH}
+COPY --from=builder /app/simpleapp-controller /simpleapp-controller
 ENTRYPOINT ["/simpleapp-controller"]
