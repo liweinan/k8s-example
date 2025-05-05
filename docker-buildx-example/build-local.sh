@@ -23,8 +23,12 @@ if ! grep -q "insecure-registries" /Users/weli/.docker/daemon.json 2>/dev/null; 
     echo '{
   "insecure-registries": ["'$HOST_IP':5002"]
 }' > /Users/weli/.docker/daemon.json
-    echo -e "${YELLOW}Please restart Docker Desktop for the changes to take effect${NC}"
-    exit 1
+    echo -e "${YELLOW}Restarting Docker Desktop...${NC}"
+    osascript -e 'quit app "Docker Desktop"'
+    sleep 5
+    open -a Docker
+    echo -e "${YELLOW}Waiting for Docker to restart...${NC}"
+    sleep 30
 fi
 
 # Function to check if registry is ready
