@@ -1051,50 +1051,46 @@ Go 和 Rust 都是编译型语言，生成的目标二进制文件是架构特�
 
 因此，对于 Go 或 Rust 构建的容器，推荐显式多架构构建（如你的 Dockerfile 示例），以确保跨平台兼容性和最佳性能。
 
-## Build Scripts
+## Build Script Usage
 
-This project includes two shell scripts to help with building and testing multi-architecture images:
+The project includes a `build-local.sh` script that automates the multi-architecture build process. The script handles setting up the local registry, configuring buildx, and managing the build process.
 
-### build-local.sh
+### Basic Usage
 
-This script automates the process of building multi-architecture images using a local registry. It handles:
-
-1. Setting up a local Docker registry
-2. Configuring proxy settings (optional)
-3. Creating a multi-architecture builder
-4. Building and pushing the image to the local registry
-
-Usage:
 ```bash
-# Make the script executable
-chmod +x build-local.sh
+./build-local.sh [options]
+```
 
-# Run the script
+### Available Options
+
+- `--no-proxy`: Disable proxy settings
+- `--proxy=<url>`: Set proxy URL (e.g., `--proxy=http://localhost:7890`)
+- `--push-to-dockerhub`: Push the built image to DockerHub
+- `--dockerhub-username=<username>`: Specify DockerHub username (required when pushing to DockerHub)
+
+### Examples
+
+1. Build with local registry only:
+```bash
 ./build-local.sh
 ```
 
-Configuration:
-- `USE_PROXY`: Set to `true` to enable proxy settings (default: `true`)
-- `PROXY_URL`: The proxy server URL (default: `http://localhost:7890`)
-- `REGISTRY_PORT`: The port for the local registry (default: `5002`)
-- `REGISTRY_HOST`: The host for the local registry (default: `localhost`)
-
-### test-registry.sh
-
-This script is used to test the local registry setup and verify that multi-architecture builds work correctly. It:
-
-1. Sets up a test environment with a local registry
-2. Tests registry connectivity
-3. Pushes test images
-4. Verifies multi-architecture build capabilities
-
-Usage:
+2. Build with proxy and push to DockerHub:
 ```bash
-# Make the script executable
-chmod +x test-registry.sh
-
-# Run the script
-./test-registry.sh
+./build-local.sh --proxy=http://localhost:7890 --push-to-dockerhub --dockerhub-username=yourusername
 ```
 
-Both scripts handle platform-specific differences (macOS and Linux) automatically and clean up after themselves when completed.
+3. Build without proxy:
+```bash
+./build-local.sh --no-proxy
+```
+
+### Script Features
+
+- Sets up a local registry for testing
+- Configures buildx with containerd support
+- Handles multi-architecture builds (AMD64 and ARM64)
+- Manages proxy settings for both Docker and buildx
+- Supports pushing to DockerHub
+- Verifies manifest creation
+- Cleans up resources after build
