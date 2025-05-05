@@ -30,6 +30,7 @@ simpleapp-controller/
 ├── controllers/
 │   └── simpleapp_controller.go   # Controller implementation
 ├── Dockerfile                    # Container image build instructions
+├── build-local.sh               # Local build script with proxy support
 ├── controller-deployment.yaml    # Kubernetes deployment manifests
 ├── go.mod                       # Go module dependencies
 └── main.go                      # Main program entry point
@@ -44,8 +45,8 @@ simpleapp-controller/
 
 2. Build and deploy the controller:
    ```bash
-   # Build the multi-arch image
-   docker buildx build --platform linux/amd64,linux/arm64 -t weli/simpleapp-controller:latest --push .
+   # Build the multi-arch image using the build script
+   ./build-local.sh
 
    # Deploy the controller
    kubectl apply -f controller-deployment.yaml
@@ -69,7 +70,33 @@ go build -o simpleapp-controller .
 
 This project uses Docker Buildx to create multi-architecture container images that support both `linux/amd64` and `linux/arm64` platforms. This is particularly useful when developing on Apple Silicon (ARM64) Macs and deploying to Linux AMD64 servers.
 
-#### Build Process
+#### Using the Build Script
+
+The project includes a `build-local.sh` script that handles the build process with proxy support:
+
+```bash
+# Make the script executable
+chmod +x build-local.sh
+
+# Run the build script
+./build-local.sh
+```
+
+The build script:
+- Sets up a local Docker registry
+- Handles proxy configuration (if needed)
+- Builds and pushes multi-arch images
+- Cleans up resources after build
+
+To configure proxy settings, edit the script:
+```bash
+USE_PROXY=true  # Set to false to disable proxy
+PROXY_URL="http://host.docker.internal:7890"  # Update with your proxy URL
+```
+
+#### Manual Build Process
+
+If you prefer to build manually:
 
 1. Configure Docker Buildx:
    ```bash
@@ -97,6 +124,7 @@ The Dockerfile uses a multi-stage build process with platform-specific configura
 - Build stages use `--platform=$BUILDPLATFORM` to ensure they run on the host's architecture
 - The Go build process uses `TARGETOS` and `TARGETARCH` build arguments
 - The final stage uses a minimal distroless base image
+- Includes proxy support and IPv4 preference for network operations
 
 #### Key Features
 - Supports both AMD64 and ARM64 architectures
