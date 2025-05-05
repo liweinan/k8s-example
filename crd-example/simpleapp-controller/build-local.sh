@@ -328,20 +328,35 @@ if [ "$SKIP_SETUP" = false ]; then
         
         # Set proxy settings with IPv4 preference
         docker exec "$CONTAINER_NAME" sh -c "
-            export http_proxy='$CONTAINER_PROXY_URL'
-            export https_proxy='$CONTAINER_PROXY_URL'
-            export HTTP_PROXY='$CONTAINER_PROXY_URL'
-            export HTTPS_PROXY='$CONTAINER_PROXY_URL'
-            export no_proxy='localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal'
-            export NO_PROXY='localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal'
+            # Clear any existing proxy settings
+            unset http_proxy
+            unset https_proxy
+            unset HTTP_PROXY
+            unset HTTPS_PROXY
+            unset no_proxy
+            unset NO_PROXY
+            
+            # Set new proxy settings
+            export http_proxy=\"$CONTAINER_PROXY_URL\"
+            export https_proxy=\"$CONTAINER_PROXY_URL\"
+            export HTTP_PROXY=\"$CONTAINER_PROXY_URL\"
+            export HTTPS_PROXY=\"$CONTAINER_PROXY_URL\"
+            export no_proxy=\"localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal\"
+            export NO_PROXY=\"localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal\"
+            
             # Force IPv4 for wget
             echo 'prefer-family = IPv4' > /etc/wgetrc
+            
             # Configure Go proxy settings through environment variables
-            export GOPROXY='https://goproxy.cn,direct'
-            export GONOSUMDB='*'
-            export GONOPROXY='*'
-            export GOINSECURE='*'
-            export GOPRIVATE='*'
+            export GOPROXY=\"https://goproxy.cn,direct\"
+            export GONOSUMDB=\"*\"
+            export GONOPROXY=\"*\"
+            export GOINSECURE=\"*\"
+            export GOPRIVATE=\"*\"
+            
+            # Print current environment for debugging
+            echo \"=== Current environment ===\"
+            env | grep -i proxy
         "
     else
         BUILDX_ARGS+=(
@@ -410,6 +425,13 @@ docker buildx build \
     --build-arg CONTAINER_PROXY_URL="${CONTAINER_PROXY_URL}" \
     --build-arg http_proxy="${CONTAINER_PROXY_URL}" \
     --build-arg https_proxy="${CONTAINER_PROXY_URL}" \
+    --build-arg HTTP_PROXY="${CONTAINER_PROXY_URL}" \
+    --build-arg HTTPS_PROXY="${CONTAINER_PROXY_URL}" \
+    --build-arg GOPROXY="https://goproxy.cn,direct" \
+    --build-arg GONOSUMDB="*" \
+    --build-arg GONOPROXY="*" \
+    --build-arg GOINSECURE="*" \
+    --build-arg GOPRIVATE="*" \
     .
 
 # Verify the image was pushed successfully
