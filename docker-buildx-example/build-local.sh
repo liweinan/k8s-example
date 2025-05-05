@@ -156,7 +156,13 @@ curl -v --noproxy "*" http://localhost:5002/v2/python/tags/list
 
 # Build the application image
 log "Building the application image..."
-sed -i.bak 's/registry:5000/localhost:5002/g' Dockerfile
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' 's/registry:5000/localhost:5002/g' Dockerfile
+else
+    # Linux
+    sed -i 's/registry:5000/localhost:5002/g' Dockerfile
+fi
 
 # Prepare build arguments
 BUILD_ARGS=(
@@ -192,7 +198,6 @@ BUILD_ARGS+=(
 )
 
 docker buildx build "${BUILD_ARGS[@]}"
-mv Dockerfile.bak Dockerfile
 
 # Clean up
 log "Cleaning up..."

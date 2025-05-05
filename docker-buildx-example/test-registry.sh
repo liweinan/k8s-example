@@ -104,7 +104,13 @@ docker run --rm --network registry-net curlimages/curl -v http://registry:5000/v
 
 # Update Dockerfile.test to use registry container name
 log "Updating Dockerfile.test..."
-sed -i.bak 's/localhost:5002/registry:5000/g' Dockerfile.test
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' 's/localhost:5002/registry:5000/g' Dockerfile.test
+else
+    # Linux
+    sed -i 's/localhost:5002/registry:5000/g' Dockerfile.test
+fi
 
 # Test build with no proxy
 log "Testing build with verbose output and no proxy..."
@@ -122,10 +128,6 @@ docker buildx build \
 # Clean up config
 log "Cleaning up registry config..."
 rm -f registry-config.json
-
-# Restore Dockerfile.test
-log "Restoring Dockerfile.test..."
-mv Dockerfile.test.bak Dockerfile.test
 
 # Clean up
 log "Cleaning up..."
