@@ -17,6 +17,13 @@ RUN echo 'prefer-family = IPv4' > /etc/wgetrc && \
     echo "https_proxy = ${CONTAINER_PROXY_URL}" >> /etc/wgetrc && \
     echo "no_proxy = localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal" >> /etc/wgetrc
 
+# Configure Go proxy settings for container environment
+RUN go env -w GOPROXY="https://goproxy.cn,direct" && \
+    go env -w GONOSUMDB="*" && \
+    go env -w GONOPROXY="*" && \
+    go env -w GOINSECURE="*" && \
+    go env -w GOPRIVATE="*"
+
 # Print proxy environment for debugging
 RUN echo "=== [deps] Proxy env ===" && env | grep -i proxy
 RUN echo "=== [deps] Go env ===" && go env | grep -i proxy
