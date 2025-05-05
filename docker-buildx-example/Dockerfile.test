@@ -1,0 +1,2 @@
+FROM registry:5000/python:3.11-slim-amd64
+RUN echo "Test successful!" 
