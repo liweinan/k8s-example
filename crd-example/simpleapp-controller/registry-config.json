@@ -1,0 +1,4 @@
+[registry."localhost:5002"]
+  http = true
+  insecure = true
+  mirrors = ["http://localhost:5002"]

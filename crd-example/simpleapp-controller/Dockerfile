@@ -1,8 +1,12 @@
 # Multi-stage build for creating a multi-architecture container image
 
+# Global build arguments
+ARG BASE_IMAGE=localhost:5002/golang:1.21-amd64
+ARG TARGETARCH
+ARG DISTROLESS_IMAGE=localhost:5002/distroless-static:nonroot-${TARGETARCH}
+
 # Stage 1: Dependencies - Downloads Go module dependencies
-ARG BUILDPLATFORM
-FROM localhost:5002/golang:1.21-amd64 AS deps
+FROM ${BASE_IMAGE} AS deps
 WORKDIR /app
 
 # Add host.docker.internal to hosts file for proxy access
@@ -21,7 +25,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Stage 2: Builder - Compiles the Go binary
-FROM localhost:5002/golang:1.21-amd64 AS builder
+FROM ${BASE_IMAGE} AS builder
 WORKDIR /app
 
 # Add host.docker.internal to hosts file for proxy access
@@ -50,7 +54,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o simpleapp-contro
 
 # Stage 3: Final - Creates the minimal production image
 # Using distroless base image for security and minimal size
-FROM localhost:5002/distroless-static:nonroot
+FROM ${DISTROLESS_IMAGE}
 WORKDIR /
 
 # (Optional) Proxy debug in final image, usually not needed
