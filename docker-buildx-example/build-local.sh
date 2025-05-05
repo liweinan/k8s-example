@@ -10,9 +10,22 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Get host IP
-HOST_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
+# Get host IP (use en0 interface on macOS)
+HOST_IP=$(ifconfig en0 | grep "inet " | awk '{print $2}')
+if [ -z "$HOST_IP" ]; then
+    HOST_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
+fi
 echo -e "${YELLOW}Using host IP: $HOST_IP${NC}"
+
+# Configure Docker to use insecure registry
+echo -e "${YELLOW}Configuring Docker to use insecure registry...${NC}"
+if ! grep -q "insecure-registries" /Users/weli/.docker/daemon.json 2>/dev/null; then
+    echo '{
+  "insecure-registries": ["'$HOST_IP':5002"]
+}' > /Users/weli/.docker/daemon.json
+    echo -e "${YELLOW}Please restart Docker Desktop for the changes to take effect${NC}"
+    exit 1
+fi
 
 # Function to check if registry is ready
 check_registry() {
