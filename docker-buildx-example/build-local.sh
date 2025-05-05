@@ -5,9 +5,14 @@ set -e
 
 # Configuration
 USE_PROXY=true  # Set to false to disable proxy
-PROXY_URL="http://localhost:7890"
+PROXY_URL=""  # Will be set by command line argument
+PUSH_TO_DOCKERHUB=false  # Set to true to push to DockerHub
+DOCKERHUB_USERNAME=""  # Will be set by command line argument
 REGISTRY_PORT=5002
 REGISTRY_HOST="localhost"
+IMAGE_NAME="app"
+IMAGE_TAG="latest"
+DOCKERHUB_IMAGE_NAME=""  # Will be set based on username
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -28,16 +33,58 @@ success() {
     echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS: $1${NC}"
 }
 
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --no-proxy)
+            USE_PROXY=false
+            shift
+            ;;
+        --proxy=*)
+            USE_PROXY=true
+            PROXY_URL="${key#*=}"
+            shift
+            ;;
+        --push-to-dockerhub)
+            PUSH_TO_DOCKERHUB=true
+            shift
+            ;;
+        --dockerhub-username=*)
+            DOCKERHUB_USERNAME="${key#*=}"
+            DOCKERHUB_IMAGE_NAME="$DOCKERHUB_USERNAME/$IMAGE_NAME"
+            shift
+            ;;
+        *)
+            error "Unknown option: $key"
+            exit 1
+            ;;
+    esac
+done
+
+# Validate DockerHub settings if pushing
+if [ "$PUSH_TO_DOCKERHUB" = true ]; then
+    if [ -z "$DOCKERHUB_USERNAME" ]; then
+        error "DockerHub username is required when pushing to DockerHub"
+        exit 1
+    fi
+    log "Will push to DockerHub as: $DOCKERHUB_IMAGE_NAME"
+fi
+
 # Configure proxy settings
 if [ "$USE_PROXY" = true ]; then
+    if [ -z "$PROXY_URL" ]; then
+        error "Proxy URL is required when proxying is enabled"
+        exit 1
+    fi
     log "Setting up proxy at $PROXY_URL..."
     export http_proxy="$PROXY_URL"
     export https_proxy="$PROXY_URL"
     export HTTP_PROXY="$PROXY_URL"
     export HTTPS_PROXY="$PROXY_URL"
     # Don't proxy local registry access
-    export no_proxy="localhost,127.0.0.1,registry,registry:5000"
-    export NO_PROXY="localhost,127.0.0.1,registry,registry:5000"
+    export no_proxy="localhost,127.0.0.1,registry,registry:5000,localhost:5002"
+    export NO_PROXY="localhost,127.0.0.1,registry,registry:5000,localhost:5002"
 else
     log "Removing proxy settings..."
     unset http_proxy
@@ -95,19 +142,34 @@ BUILDX_ARGS=(
     --name multiarch-builder
     --driver docker-container
     --driver-opt network=host
+    --driver-opt image=moby/buildkit:buildx-stable-1
+    --driver-opt env.BUILDKITD_FLAGS="--allow-insecure-entitlement=network.host --containerd-worker=true"
+    --platform linux/amd64,linux/arm64
     --config registry-config.json
+    --use
 )
 
 if [ "$USE_PROXY" = true ]; then
     docker buildx create "${BUILDX_ARGS[@]}" --bootstrap
     CONTAINER_NAME="buildx_buildkit_multiarch-builder0"
+    
+    # Get host IP (force IPv4)
+    HOST_IP=$(docker run --rm alpine sh -c "getent ahostsv4 host.docker.internal | awk 'NR==1{print \$1}'" || echo "192.168.65.2")
+    log "Using host IP: $HOST_IP"
+    
+    # Add host.docker.internal to the buildx container with IPv4
+    docker exec "$CONTAINER_NAME" sh -c "echo '$HOST_IP host.docker.internal' >> /etc/hosts"
+    
+    # Set proxy settings with IPv4 preference
     docker exec "$CONTAINER_NAME" sh -c "
         export http_proxy='$PROXY_URL'
         export https_proxy='$PROXY_URL'
         export HTTP_PROXY='$PROXY_URL'
         export HTTPS_PROXY='$PROXY_URL'
-        export no_proxy='localhost,127.0.0.1,registry,registry:5000,localhost:5002'
-        export NO_PROXY='localhost,127.0.0.1,registry,registry:5000,localhost:5002'
+        export no_proxy='localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal'
+        export NO_PROXY='localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal'
+        # Force IPv4 for wget
+        echo 'prefer-family = IPv4' > /etc/wgetrc
     "
 else
     BUILDX_ARGS+=(
@@ -122,7 +184,8 @@ else
     docker buildx create "${BUILDX_ARGS[@]}"
 fi
 
-docker buildx use multiarch-builder
+# Enable containerd image store and verify setup
+docker buildx inspect multiarch-builder --bootstrap
 
 # Network diagnostics
 log "Running network diagnostics..."
@@ -166,6 +229,7 @@ fi
 
 # Prepare build arguments
 BUILD_ARGS=(
+    --builder multiarch-builder
     --progress=plain
     --platform linux/amd64,linux/arm64
 )
@@ -177,8 +241,8 @@ if [ "$USE_PROXY" = true ]; then
         --build-arg https_proxy="$PROXY_URL"
         --build-arg HTTP_PROXY="$PROXY_URL"
         --build-arg HTTPS_PROXY="$PROXY_URL"
-        --build-arg no_proxy="localhost,127.0.0.1,registry,registry:5000"
-        --build-arg NO_PROXY="localhost,127.0.0.1,registry,registry:5000"
+        --build-arg no_proxy="localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal"
+        --build-arg NO_PROXY="localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal"
     )
 else
     BUILD_ARGS+=(
@@ -191,13 +255,72 @@ else
     )
 fi
 
+# Add tags based on push target
 BUILD_ARGS+=(
-    -t localhost:5002/app:latest
+    -t localhost:5002/$IMAGE_NAME:$IMAGE_TAG
+)
+
+if [ "$PUSH_TO_DOCKERHUB" = true ]; then
+    BUILD_ARGS+=(
+        -t $DOCKERHUB_IMAGE_NAME:$IMAGE_TAG
+    )
+fi
+
+BUILD_ARGS+=(
     --push
     .
 )
 
 docker buildx build "${BUILD_ARGS[@]}"
+
+# If pushing to DockerHub, verify the manifest
+if [ "$PUSH_TO_DOCKERHUB" = true ]; then
+    log "Verifying DockerHub manifest..."
+    # First try to get the manifest without authentication
+    CURL_ARGS=()
+    if [ "$USE_PROXY" = true ]; then
+        CURL_ARGS=(
+            --proxy "$PROXY_URL"
+            --noproxy "localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal"
+        )
+    else
+        CURL_ARGS=(
+            --noproxy "*"
+        )
+    fi
+
+    MANIFEST_INFO=$(curl -s "${CURL_ARGS[@]}" \
+        -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+        https://registry.hub.docker.com/v2/$DOCKERHUB_USERNAME/$IMAGE_NAME/manifests/$IMAGE_TAG)
+    
+    # If that fails, try with authentication
+    if [ $? -ne 0 ] || [ -z "$MANIFEST_INFO" ]; then
+        log "Trying to verify manifest with authentication..."
+        # Get DockerHub token
+        TOKEN=$(curl -s "${CURL_ARGS[@]}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"username": "'"$DOCKERHUB_USERNAME"'", "password": "'"$DOCKERHUB_PASSWORD"'"}' \
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
+        
+        if [ -n "$TOKEN" ]; then
+            MANIFEST_INFO=$(curl -s "${CURL_ARGS[@]}" \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+                https://registry.hub.docker.com/v2/$DOCKERHUB_USERNAME/$IMAGE_NAME/manifests/$IMAGE_TAG)
+        fi
+    fi
+    
+    if [ -n "$MANIFEST_INFO" ] && echo "$MANIFEST_INFO" | grep -q "amd64" && echo "$MANIFEST_INFO" | grep -q "arm64"; then
+        success "DockerHub manifest verification successful - both architectures present"
+    else
+        log "Could not verify DockerHub manifest - this is expected if you don't have access to the repository"
+        log "You can verify the manifest manually by running:"
+        log "docker manifest inspect $DOCKERHUB_IMAGE_NAME:$IMAGE_TAG"
+    fi
+    
+    success "Successfully pushed multi-arch image to DockerHub: $DOCKERHUB_IMAGE_NAME:$IMAGE_TAG"
+fi
 
 # Clean up
 log "Cleaning up..."
@@ -207,4 +330,7 @@ docker buildx rm multiarch-builder
 docker network rm registry-net
 
 success "Build process completed successfully!"
-success "Image available at: localhost:5002/app:latest" 
+success "Image available at: localhost:5002/$IMAGE_NAME:$IMAGE_TAG"
+if [ "$PUSH_TO_DOCKERHUB" = true ]; then
+    success "Image also available at: $DOCKERHUB_IMAGE_NAME:$IMAGE_TAG"
+fi 
