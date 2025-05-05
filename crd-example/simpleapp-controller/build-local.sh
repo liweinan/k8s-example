@@ -336,12 +336,12 @@ if [ "$SKIP_SETUP" = false ]; then
             export NO_PROXY='localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal'
             # Force IPv4 for wget
             echo 'prefer-family = IPv4' > /etc/wgetrc
-            # Configure Go proxy settings
-            go env -w GOPROXY='https://goproxy.cn,direct'
-            go env -w GONOSUMDB='*'
-            go env -w GONOPROXY='*'
-            go env -w GOINSECURE='*'
-            go env -w GOPRIVATE='*'
+            # Configure Go proxy settings through environment variables
+            export GOPROXY='https://goproxy.cn,direct'
+            export GONOSUMDB='*'
+            export GONOPROXY='*'
+            export GOINSECURE='*'
+            export GOPRIVATE='*'
         "
     else
         BUILDX_ARGS+=(
