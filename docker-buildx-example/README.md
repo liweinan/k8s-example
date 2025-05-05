@@ -851,7 +851,7 @@ Hello from ARM64!
    即使你没有显式使用多架构构建，Docker Hub 或其他镜像仓库中的官方镜像（如 `python:3.11-slim`）通常是多架构镜像（multiarch images）。这些镜像通过 **Docker manifest** 支持多个架构：
    - 当你运行 `docker pull python:3.11-slim` 时，Docker 客户端会根据主机架构（`$TARGETARCH`）自动拉取对应的架构变体（例如 `amd64` 或 `arm64`）。
    - 例如，`python:3.11-slim` 镜像在 Docker Hub 上有一个 manifest list，包含 `linux/amd64`、`linux/arm64` 等多个架构的镜像变体。
-   - 因此，即使你的 Dockerfile 没有显式指定 `--platform`，Docker 运行时会根据主机架构选择正确的镜像变体。这让你感觉镜像“天然”跨平台运行。
+   - 因此，即使你的 Dockerfile 没有显式指定 `--platform`，Docker 运行时会根据主机架构选择正确的镜像变体。这让你感觉镜像"天然"跨平台运行。
 
 3. **QEMU 模拟器的透明支持**  
    Docker Desktop 和现代容器运行时（如 containerd）集成了 **QEMU**，一个用户态模拟器，可以在不同架构上模拟运行容器：
@@ -871,13 +871,13 @@ Hello from ARM64!
    - 即使你没有显式配置多架构构建，你使用的上游镜像可能已经为你处理了架构兼容性问题。
 
 ### 为什么这不是幸存者偏差？
-幸存者偏差指的是只看到成功案例而忽略失败案例，导致错误的结论。在这里，容器跨平台运行的普遍性不是因为你只看到了“幸存”的镜像，而是因为以下系统性原因：
+幸存者偏差指的是只看到成功案例而忽略失败案例，导致错误的结论。在这里，容器跨平台运行的普遍性不是因为你只看到了"幸存"的镜像，而是因为以下系统性原因：
 - **Docker 的设计目标**：Docker 从设计上就希望容器具有高度可移植性，manifest list 和 QEMU 的引入进一步降低了架构壁垒。
 - **官方镜像的广泛支持**：你使用的 `python:3.11-slim` 这样的镜像通常由社区或官方维护，已经为多架构场景优化。
-- **运行时补救**：即使镜像没有为目标架构构建，QEMU 模拟器会在后台“拯救”运行，减少失败案例的出现。
+- **运行时补救**：即使镜像没有为目标架构构建，QEMU 模拟器会在后台"拯救"运行，减少失败案例的出现。
 
 ### 什么时候会遇到跨平台问题？
-尽管很多容器“看起来”能跨平台运行，但以下情况可能暴露架构不兼容的问题：
+尽管很多容器"看起来"能跨平台运行，但以下情况可能暴露架构不兼容的问题：
 1. **自定义二进制**：如果你的应用包含架构特定的原生二进制（如 C/C++ 编译的库），而这些二进制没有为目标架构编译，容器会失败。
    - 例如，Python 的某些库（如 `numpy`、`pandas`）可能依赖 C 扩展，如果镜像中这些库是为 AMD64 编译的，它们在 ARM64 上会失败。
 2. **非多架构基础镜像**：如果你的基础镜像不是多架构镜像（例如某些私有仓库的镜像），Docker 无法自动选择正确的架构变体。
@@ -935,7 +935,7 @@ Go 和 Rust 都是编译型语言，生成的目标二进制文件是架构特�
 
 #### 1. 基础镜像的多架构支持
 - 许多官方镜像（如 `golang`、`rust`）是多架构镜像，包含 `linux/amd64`、`linux/arm64` 等变体。通过 Docker 的 manifest list，运行 `docker pull golang:1.21` 时，Docker 会自动拉取与主机架构匹配的变体。
-- **如果你的 Dockerfile 只包含构建步骤**（例如，编译 Go/Rust 代码并生成二进制），且使用多架构的基础镜像（如 `FROM golang:1.21`），Docker 会在构建时选择正确的基础镜像变体。这意味着你的构建过程可能“看起来”支持多架构。
+- **如果你的 Dockerfile 只包含构建步骤**（例如，编译 Go/Rust 代码并生成二进制），且使用多架构的基础镜像（如 `FROM golang:1.21`），Docker 会在构建时选择正确的基础镜像变体。这意味着你的构建过程可能"看起来"支持多架构。
 - **但是**，基础镜像的多架构支持只保证构建环境（编译器、工具链）适配目标架构。最终输出的二进制文件的架构取决于构建时的配置（例如，Go 的 `GOARCH` 或 Rust 的 target triple）。
 
 #### 2. 生成的二进制的架构
@@ -1050,3 +1050,51 @@ Go 和 Rust 都是编译型语言，生成的目标二进制文件是架构特�
 - **Go 和 Rust 的特殊性**：Go 的静态链接和交叉编译使其更适合多架构构建；Rust 需要额外注意动态链接依赖，但使用 `musl` 目标可以简化跨平台支持。
 
 因此，对于 Go 或 Rust 构建的容器，推荐显式多架构构建（如你的 Dockerfile 示例），以确保跨平台兼容性和最佳性能。
+
+## Build Scripts
+
+This project includes two shell scripts to help with building and testing multi-architecture images:
+
+### build-local.sh
+
+This script automates the process of building multi-architecture images using a local registry. It handles:
+
+1. Setting up a local Docker registry
+2. Configuring proxy settings (optional)
+3. Creating a multi-architecture builder
+4. Building and pushing the image to the local registry
+
+Usage:
+```bash
+# Make the script executable
+chmod +x build-local.sh
+
+# Run the script
+./build-local.sh
+```
+
+Configuration:
+- `USE_PROXY`: Set to `true` to enable proxy settings (default: `true`)
+- `PROXY_URL`: The proxy server URL (default: `http://localhost:7890`)
+- `REGISTRY_PORT`: The port for the local registry (default: `5002`)
+- `REGISTRY_HOST`: The host for the local registry (default: `localhost`)
+
+### test-registry.sh
+
+This script is used to test the local registry setup and verify that multi-architecture builds work correctly. It:
+
+1. Sets up a test environment with a local registry
+2. Tests registry connectivity
+3. Pushes test images
+4. Verifies multi-architecture build capabilities
+
+Usage:
+```bash
+# Make the script executable
+chmod +x test-registry.sh
+
+# Run the script
+./test-registry.sh
+```
+
+Both scripts handle platform-specific differences (macOS and Linux) automatically and clean up after themselves when completed.
