@@ -7,6 +7,7 @@ set -e
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Function to check if registry is ready
@@ -15,16 +16,45 @@ check_registry() {
     local max_attempts=30
     local attempt=1
     while [ $attempt -le $max_attempts ]; do
+        echo -e "${YELLOW}Attempt $attempt: Checking registry health...${NC}"
+        # Check if container is running
+        if ! docker ps | grep -q registry; then
+            echo -e "${RED}Registry container is not running!${NC}"
+            docker ps -a | grep registry
+            return 1
+        fi
+        
+        # Check registry logs
+        echo -e "${YELLOW}Registry logs:${NC}"
+        docker logs registry --tail 10
+        
+        # Check registry health endpoint
         if curl -s http://localhost:5002/v2/ > /dev/null; then
             echo -e "${GREEN}Registry is ready!${NC}"
             return 0
         fi
-        echo -e "${BLUE}Attempt $attempt: Registry not ready yet, waiting...${NC}"
+        
+        echo -e "${YELLOW}Registry not ready yet, waiting...${NC}"
         sleep 2
         attempt=$((attempt + 1))
     done
     echo -e "${RED}Registry failed to start after $max_attempts attempts${NC}"
     return 1
+}
+
+# Function to verify base images
+verify_base_images() {
+    echo -e "${BLUE}Verifying base images in registry...${NC}"
+    local images=("python:3.11-slim-arm64" "python:3.11-slim-amd64")
+    for image in "${images[@]}"; do
+        echo -e "${YELLOW}Checking $image...${NC}"
+        if ! curl -s http://localhost:5002/v2/python/manifests/$(echo $image | cut -d: -f2) > /dev/null; then
+            echo -e "${RED}Failed to verify $image in registry${NC}"
+            return 1
+        fi
+        echo -e "${GREEN}$image verified successfully${NC}"
+    done
+    return 0
 }
 
 # Cleanup function
@@ -77,6 +107,9 @@ docker pull --platform linux/amd64 python:3.11-slim
 docker tag python:3.11-slim localhost:5002/python:3.11-slim-amd64
 docker push localhost:5002/python:3.11-slim-amd64
 
+# Verify base images are in registry
+verify_base_images || exit 1
+
 # Step 3: Create a new builder instance
 echo -e "${GREEN}Step 3: Creating new builder instance...${NC}"
 docker buildx create --name multiarch-builder --driver docker-container --bootstrap
@@ -88,6 +121,8 @@ docker buildx inspect --bootstrap
 
 # Step 5: Build and push to local registry
 echo -e "${GREEN}Step 5: Building and pushing to local registry...${NC}"
+echo -e "${YELLOW}Build command:${NC}"
+echo "docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/multiarch-example:latest --push --provenance=false --sbom=false ."
 docker buildx build --platform linux/amd64,linux/arm64 \
     -t localhost:5002/multiarch-example:latest \
     --push --provenance=false --sbom=false .
