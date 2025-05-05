@@ -7,6 +7,11 @@ ENV http_proxy=${CONTAINER_PROXY_URL}
 ENV https_proxy=${CONTAINER_PROXY_URL}
 ENV HTTP_PROXY=${CONTAINER_PROXY_URL}
 ENV HTTPS_PROXY=${CONTAINER_PROXY_URL}
+ENV GOPROXY="https://goproxy.cn,direct"
+ENV GONOSUMDB="*"
+ENV GONOPROXY="*"
+ENV GOINSECURE="*"
+ENV GOPRIVATE="*"
 
 # Configure wget to prefer IPv4 and add retry logic
 RUN echo 'prefer-family = IPv4' > /etc/wgetrc && \
@@ -17,12 +22,10 @@ RUN echo 'prefer-family = IPv4' > /etc/wgetrc && \
     echo "https_proxy = ${CONTAINER_PROXY_URL}" >> /etc/wgetrc && \
     echo "no_proxy = localhost,127.0.0.1,registry,registry:5000,localhost:5002,host.docker.internal" >> /etc/wgetrc
 
-# Configure Go proxy settings for container environment
-RUN go env -w GOPROXY="https://goproxy.cn,direct" && \
-    go env -w GONOSUMDB="*" && \
-    go env -w GONOPROXY="*" && \
-    go env -w GOINSECURE="*" && \
-    go env -w GOPRIVATE="*"
+# Configure git to use proxy
+RUN git config --global http.proxy ${CONTAINER_PROXY_URL} && \
+    git config --global https.proxy ${CONTAINER_PROXY_URL} && \
+    git config --global http.sslVerify false
 
 # Print proxy environment for debugging
 RUN echo "=== [deps] Proxy env ===" && env | grep -i proxy
