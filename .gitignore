@@ -1,2 +1,25 @@
 # SpecStory explanation file
 .specstory/.what-is-this.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+**/simpleapp-controller/bin
+**/simpleapp-controller/build
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Cursor specific
+.cursorindexingignore
+.specstory/
+
+# OS specific
+.DS_Store
+Thumbs.db
