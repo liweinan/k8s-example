@@ -9,6 +9,24 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Function to check if registry is ready
+check_registry() {
+    echo -e "${BLUE}Waiting for registry to be ready...${NC}"
+    local max_attempts=30
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        if curl -s http://localhost:5002/v2/ > /dev/null; then
+            echo -e "${GREEN}Registry is ready!${NC}"
+            return 0
+        fi
+        echo -e "${BLUE}Attempt $attempt: Registry not ready yet, waiting...${NC}"
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    echo -e "${RED}Registry failed to start after $max_attempts attempts${NC}"
+    return 1
+}
+
 # Cleanup function
 cleanup() {
     echo -e "${BLUE}Cleaning up...${NC}"
@@ -39,6 +57,9 @@ echo -e "${GREEN}Step 1: Starting local registry...${NC}"
 docker run -d --name registry -p 5002:5000 \
     -v $(pwd)/registry-config.yml:/etc/docker/registry/config.yml \
     registry:2
+
+# Wait for registry to be ready
+check_registry || exit 1
 
 # Step 2: Pull and push base images to local registry
 echo -e "${GREEN}Step 2: Setting up base images in local registry...${NC}"
