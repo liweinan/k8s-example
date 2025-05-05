@@ -3,6 +3,12 @@
 # Exit on error
 set -e
 
+# Configuration
+USE_PROXY=true  # Set to false to disable proxy
+PROXY_URL="http://localhost:7890"
+REGISTRY_PORT=5002
+REGISTRY_HOST="localhost"
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -10,98 +16,190 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Unset proxy environment variables
-echo -e "${YELLOW}Removing proxy settings...${NC}"
-unset http_proxy
-unset https_proxy
-unset HTTP_PROXY
-unset HTTPS_PROXY
-
-# Configure Docker to use insecure registry
-echo -e "${YELLOW}Configuring Docker settings...${NC}"
-if ! grep -q "insecure-registries" /Users/weli/.docker/daemon.json 2>/dev/null; then
-    echo '{
-  "insecure-registries": ["localhost:5002"]
-}' > /Users/weli/.docker/daemon.json
-    echo -e "${YELLOW}Restarting Docker Desktop...${NC}"
-    osascript -e 'quit app "Docker Desktop"'
-    sleep 5
-    open -a Docker
-    echo -e "${YELLOW}Waiting for Docker to restart...${NC}"
-    sleep 30
-fi
-
-# Function to check if registry is ready
-check_registry_health() {
-    echo -e "${YELLOW}Checking registry health...${NC}"
-    if curl -s http://localhost:5002/v2/ > /dev/null; then
-        echo -e "${GREEN}Registry is ready!${NC}"
-        return 0
-    else
-        echo -e "${RED}Registry is not ready yet${NC}"
-        return 1
-    fi
+log() {
+    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"
 }
 
-echo -e "${BLUE}Starting local build process...${NC}"
+error() {
+    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
+}
+
+success() {
+    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS: $1${NC}"
+}
+
+# Configure proxy settings
+if [ "$USE_PROXY" = true ]; then
+    log "Setting up proxy at $PROXY_URL..."
+    export http_proxy="$PROXY_URL"
+    export https_proxy="$PROXY_URL"
+    export HTTP_PROXY="$PROXY_URL"
+    export HTTPS_PROXY="$PROXY_URL"
+    # Don't proxy local registry access
+    export no_proxy="localhost,127.0.0.1,registry,registry:5000"
+    export NO_PROXY="localhost,127.0.0.1,registry,registry:5000"
+else
+    log "Removing proxy settings..."
+    unset http_proxy
+    unset https_proxy
+    unset HTTP_PROXY
+    unset HTTPS_PROXY
+    unset no_proxy
+    unset NO_PROXY
+fi
 
 # Clean up any existing containers and builders
-echo -e "${YELLOW}Cleaning up...${NC}"
+log "Cleaning up..."
 docker rm -f registry 2>/dev/null || true
 docker buildx rm multiarch-builder 2>/dev/null || true
 
-# Create and use a new builder
-echo -e "${YELLOW}Creating new builder...${NC}"
-docker buildx create --name multiarch-builder --driver docker-container --bootstrap
-docker buildx use multiarch-builder
+# Create Docker network
+log "Creating Docker network..."
+docker network create registry-net 2>/dev/null || true
 
-# Step 1: Start local registry
-echo -e "${YELLOW}Step 1: Starting local registry...${NC}"
-docker run -d --name registry -p 5002:5000 registry:2
-echo -e "${YELLOW}Waiting for registry to be ready...${NC}"
+# Create registry config
+log "Creating registry config..."
+cat > registry-config.json << 'EOF'
+[registry."localhost:5002"]
+  http = true
+  insecure = true
+EOF
+
+# Start local registry with explicit HTTP configuration
+log "Starting local registry..."
+docker run -d --name registry \
+    --network registry-net \
+    -p 5002:5000 \
+    -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 \
+    -e REGISTRY_HTTP_NET=tcp \
+    registry:2
 
 # Wait for registry to be ready
-max_attempts=5
-attempt=1
-while [ $attempt -le $max_attempts ]; do
-    echo -e "${YELLOW}Attempt $attempt: Checking registry health...${NC}"
-    echo -e "${YELLOW}Registry logs:${NC}"
-    docker logs registry
-    if check_registry_health; then
-        break
-    fi
-    if [ $attempt -eq $max_attempts ]; then
-        echo -e "${RED}Registry failed to start after $max_attempts attempts${NC}"
-        exit 1
-    fi
-    sleep 5
-    attempt=$((attempt + 1))
+log "Waiting for registry to be ready..."
+until curl -s --noproxy "*" http://localhost:5002/v2/_catalog > /dev/null; do
+    sleep 1
 done
 
-# Step 2: Set up base images in local registry
-echo -e "${YELLOW}Step 2: Setting up base images in local registry...${NC}"
-echo -e "${YELLOW}Pulling and pushing Python base images...${NC}"
+# Test registry connection
+log "Testing registry connection..."
+if curl -v --noproxy "*" http://localhost:5002/v2/_catalog; then
+    success "Registry is accessible"
+else
+    error "Registry is not accessible"
+    exit 1
+fi
+
+# Create and use a new builder
+log "Creating new builder..."
+BUILDX_ARGS=(
+    --name multiarch-builder
+    --driver docker-container
+    --driver-opt network=host
+    --config registry-config.json
+)
+
+if [ "$USE_PROXY" = true ]; then
+    docker buildx create "${BUILDX_ARGS[@]}" --bootstrap
+    CONTAINER_NAME="buildx_buildkit_multiarch-builder0"
+    docker exec "$CONTAINER_NAME" sh -c "
+        export http_proxy='$PROXY_URL'
+        export https_proxy='$PROXY_URL'
+        export HTTP_PROXY='$PROXY_URL'
+        export HTTPS_PROXY='$PROXY_URL'
+        export no_proxy='localhost,127.0.0.1,registry,registry:5000,localhost:5002'
+        export NO_PROXY='localhost,127.0.0.1,registry,registry:5000,localhost:5002'
+    "
+else
+    BUILDX_ARGS+=(
+        --driver-opt env.http_proxy=""
+        --driver-opt env.https_proxy=""
+        --driver-opt env.HTTP_PROXY=""
+        --driver-opt env.HTTPS_PROXY=""
+        --driver-opt env.no_proxy="*"
+        --driver-opt env.NO_PROXY="*"
+        --bootstrap
+    )
+    docker buildx create "${BUILDX_ARGS[@]}"
+fi
+
+docker buildx use multiarch-builder
+
+# Network diagnostics
+log "Running network diagnostics..."
+log "Checking registry container network..."
+docker inspect registry | grep -A 10 "NetworkSettings"
+log "Checking buildx container network..."
+docker inspect buildx_buildkit_multiarch-builder0 | grep -A 10 "NetworkSettings"
+log "Testing network connectivity between containers..."
+docker run --rm --network registry-net registry:2 ping -c 1 registry
+log "Testing registry access from network..."
+docker run --rm --network registry-net curlimages/curl -v http://registry:5000/v2/_catalog
+
+# Set up base images in local registry
+log "Setting up base images in local registry..."
 
 # Handle AMD64 base image
-echo -e "${YELLOW}Handling AMD64 base image...${NC}"
+log "Handling AMD64 base image..."
 docker pull --platform linux/amd64 python:3.11-slim
 docker tag python:3.11-slim localhost:5002/python:3.11-slim-amd64
 docker push localhost:5002/python:3.11-slim-amd64
 
 # Handle ARM64 base image
-echo -e "${YELLOW}Handling ARM64 base image...${NC}"
+log "Handling ARM64 base image..."
 docker pull --platform linux/arm64 python:3.11-slim
 docker tag python:3.11-slim localhost:5002/python:3.11-slim-arm64
 docker push localhost:5002/python:3.11-slim-arm64
 
-# Step 3: Build the application image
-echo -e "${YELLOW}Step 3: Building the application image...${NC}"
-docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/app:latest --push .
+# Verify images in registry
+log "Verifying images in registry..."
+curl -v --noproxy "*" http://localhost:5002/v2/python/tags/list
 
-# Step 4: Clean up
-echo -e "${YELLOW}Step 4: Cleaning up...${NC}"
+# Build the application image
+log "Building the application image..."
+sed -i.bak 's/registry:5000/localhost:5002/g' Dockerfile
+
+# Prepare build arguments
+BUILD_ARGS=(
+    --progress=plain
+    --platform linux/amd64,linux/arm64
+)
+
+# Add proxy settings to build if enabled
+if [ "$USE_PROXY" = true ]; then
+    BUILD_ARGS+=(
+        --build-arg http_proxy="$PROXY_URL"
+        --build-arg https_proxy="$PROXY_URL"
+        --build-arg HTTP_PROXY="$PROXY_URL"
+        --build-arg HTTPS_PROXY="$PROXY_URL"
+        --build-arg no_proxy="localhost,127.0.0.1,registry,registry:5000"
+        --build-arg NO_PROXY="localhost,127.0.0.1,registry,registry:5000"
+    )
+else
+    BUILD_ARGS+=(
+        --build-arg http_proxy=""
+        --build-arg https_proxy=""
+        --build-arg HTTP_PROXY=""
+        --build-arg HTTPS_PROXY=""
+        --build-arg no_proxy="*"
+        --build-arg NO_PROXY="*"
+    )
+fi
+
+BUILD_ARGS+=(
+    -t localhost:5002/app:latest
+    --push
+    .
+)
+
+docker buildx build "${BUILD_ARGS[@]}"
+mv Dockerfile.bak Dockerfile
+
+# Clean up
+log "Cleaning up..."
+rm -f registry-config.json
 docker rm -f registry
 docker buildx rm multiarch-builder
+docker network rm registry-net
 
-echo -e "${GREEN}Build process completed successfully!${NC}"
-echo -e "${GREEN}Image available at: localhost:5002/app:latest${NC}" 
+success "Build process completed successfully!"
+success "Image available at: localhost:5002/app:latest" 
