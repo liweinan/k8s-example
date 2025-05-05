@@ -10,6 +10,13 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Unset proxy environment variables
+echo -e "${YELLOW}Removing proxy settings...${NC}"
+unset http_proxy
+unset https_proxy
+unset HTTP_PROXY
+unset HTTPS_PROXY
+
 # Get host IP (use en0 interface on macOS)
 HOST_IP=$(ifconfig en0 | grep "inet " | awk '{print $2}')
 if [ -z "$HOST_IP" ]; then
@@ -18,7 +25,7 @@ fi
 echo -e "${YELLOW}Using host IP: $HOST_IP${NC}"
 
 # Configure Docker to use insecure registry
-echo -e "${YELLOW}Configuring Docker to use insecure registry...${NC}"
+echo -e "${YELLOW}Configuring Docker settings...${NC}"
 if ! grep -q "insecure-registries" /Users/weli/.docker/daemon.json 2>/dev/null; then
     echo '{
   "insecure-registries": ["'$HOST_IP':5002"]
