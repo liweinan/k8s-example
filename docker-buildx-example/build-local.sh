@@ -76,15 +76,21 @@ done
 echo -e "${YELLOW}Step 2: Setting up base images in local registry...${NC}"
 echo -e "${YELLOW}Pulling and pushing Python base images...${NC}"
 
+# Handle AMD64 base image
+echo -e "${YELLOW}Handling AMD64 base image...${NC}"
+docker pull --platform linux/amd64 python:3.11-slim
+docker tag python:3.11-slim localhost:5002/python:3.11-slim-amd64
+docker push localhost:5002/python:3.11-slim-amd64
+
 # Handle ARM64 base image
 echo -e "${YELLOW}Handling ARM64 base image...${NC}"
-docker pull python:3.11-slim
-docker tag python:3.11-slim localhost:5002/python:3.11-slim
-docker push localhost:5002/python:3.11-slim
+docker pull --platform linux/arm64 python:3.11-slim
+docker tag python:3.11-slim localhost:5002/python:3.11-slim-arm64
+docker push localhost:5002/python:3.11-slim-arm64
 
 # Step 3: Build the application image
 echo -e "${YELLOW}Step 3: Building the application image...${NC}"
-docker buildx build --platform linux/arm64 -t localhost:5002/app:latest --push .
+docker buildx build --platform linux/amd64,linux/arm64 -t localhost:5002/app:latest --push .
 
 # Step 4: Clean up
 echo -e "${YELLOW}Step 4: Cleaning up...${NC}"
