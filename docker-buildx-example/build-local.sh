@@ -6,9 +6,33 @@ set -e
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Cleanup function
+cleanup() {
+    echo -e "${BLUE}Cleaning up...${NC}"
+    # Stop and remove existing registry container if it exists
+    if docker ps -a | grep -q registry; then
+        echo -e "${BLUE}Removing existing registry container...${NC}"
+        docker stop registry || true
+        docker rm registry || true
+    fi
+
+    # Remove existing builder if it exists
+    if docker buildx ls | grep -q multiarch-builder; then
+        echo -e "${BLUE}Removing existing builder...${NC}"
+        docker buildx rm multiarch-builder || true
+    fi
+}
+
+# Trap Ctrl+C and call cleanup
+trap cleanup EXIT
+
 echo -e "${BLUE}Starting local build process...${NC}"
+
+# Cleanup before starting
+cleanup
 
 # Step 1: Start local registry
 echo -e "${GREEN}Step 1: Starting local registry...${NC}"
