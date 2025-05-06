@@ -48,5 +48,5 @@ spec:
       serviceAccountName: simpleapp-controller
       containers:
       - name: controller
-        image: your-dockerhub-username/simpleapp-controller:latest
+        image: weli/simpleapp-controller:latest
         imagePullPolicy: Always 
