@@ -1,4 +1,6 @@
-plugins:
-  my-org/my-repo:
-    - trigger
-    - approve
+plugin_config:
+  plugins:
+    my-org/my-repo:
+      plugins:
+        - trigger
+        - approve

@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prow-viewer
+rules:
+- apiGroups: ["prow.k8s.io"]
+  resources: ["prowjobs"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prow-viewer-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: prow
+roleRef:
+  kind: ClusterRole
+  name: prow-viewer
+  apiGroup: rbac.authorization.k8s.io
