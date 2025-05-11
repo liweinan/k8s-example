@@ -1,6 +1,2 @@
 plugin_config:
-  plugins:
-    my-org/my-repo:
-      plugins:
-        - trigger
-        - approve
+  plugins: {}

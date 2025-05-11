@@ -27,6 +27,8 @@ spec:
           value: "http://192.168.0.119:1080"
         - name: HTTPS_PROXY
           value: "http://192.168.0.119:1080"
+        - name: LOGRUS_LEVEL
+          value: "debug"
         ports:
         - containerPort: 8888
         volumeMounts:
