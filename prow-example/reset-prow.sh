@@ -12,6 +12,9 @@ PROW_SETUP_FILE="./prow-setup.yaml"
 # 定义代理地址
 PROXY="http://localhost:1080"
 
+# 定义等待超时时间（秒）
+TIMEOUT=300
+
 # 打印开始信息
 echo "开始清理 Prow 服务..."
 
@@ -122,6 +125,83 @@ ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检�
 # 重新应用 prow-setup.yaml
 echo "重新应用 prow-setup.yaml..."
 k8s kubectl apply -f $PROW_SETUP_FILE
+
+# 等待 Pod 进入 Running 状态
+echo "等待 Hook 和 Deck Pod 进入 Running 状态..."
+
+# 等待 Hook Pod
+echo "等待 Hook Pod..."
+HOOK_TIMEOUT_COUNT=0
+while true; do
+    HOOK_POD=$(k8s kubectl get pods -n $NAMESPACE -l app=hook --no-headers -o custom-columns=":metadata.name" | head -n 1)
+    if [ -n "$HOOK_POD" ]; then
+        HOOK_STATUS=$(k8s kubectl get pod -n $NAMESPACE $HOOK_POD --no-headers -o custom-columns=":status.phase")
+        HOOK_READY=$(k8s kubectl get pod -n $NAMESPACE $HOOK_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
+        if [ "$HOOK_STATUS" = "Running" ] && [ -n "$HOOK_READY" ]; then
+            echo "Hook Pod ($HOOK_POD) 已进入 Running 状态且 Ready"
+            break
+        else
+            echo "Hook Pod ($HOOK_POD) 状态: $HOOK_STATUS, Ready: $HOOK_READY，等待中..."
+        fi
+    else
+        echo "未找到 Hook Pod，等待中..."
+    fi
+    sleep 5
+    HOOK_TIMEOUT_COUNT=$((HOOK_TIMEOUT_COUNT + 5))
+    if [ $HOOK_TIMEOUT_COUNT -ge $TIMEOUT ]; then
+        echo "错误：等待 Hook Pod 超时（${TIMEOUT}秒），请检查部署状态："
+        k8s kubectl get pods -n $NAMESPACE
+        exit 1
+    fi
+done
+
+# 等待 Deck Pod
+echo "等待 Deck Pod..."
+DECK_TIMEOUT_COUNT=0
+while true; do
+    DECK_POD=$(k8s kubectl get pods -n $NAMESPACE -l app=deck --no-headers -o custom-columns=":metadata.name" | head -n 1)
+    if [ -n "$DECK_POD" ]; then
+        DECK_STATUS=$(k8s kubectl get pod -n $NAMESPACE $DECK_POD --no-headers -o custom-columns=":status.phase")
+        DECK_READY=$(k8s kubectl get pod -n $NAMESPACE $DECK_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
+        if [ "$DECK_STATUS" = "Running" ] && [ -n "$DECK_READY" ]; then
+            echo "Deck Pod ($DECK_POD) 已进入 Running 状态且 Ready"
+            break
+        else
+            echo "Deck Pod ($DECK_POD) 状态: $DECK_STATUS, Ready: $DECK_READY，等待中..."
+        fi
+    else
+        echo "未找到 Deck Pod，等待中..."
+    fi
+    sleep 5
+    DECK_TIMEOUT_COUNT=$((DECK_TIMEOUT_COUNT + 5))
+    if [ $DECK_TIMEOUT_COUNT -ge $TIMEOUT ]; then
+        echo "错误：等待 Deck Pod 超时（${TIMEOUT}秒），请检查部署状态："
+        k8s kubectl get pods -n $NAMESPACE
+        exit 1
+    fi
+done
+
+# 检查 Hook 容器端口
+echo "检查 Hook 容器端口 (8888)..."
+HOOK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "netstat -tuln 2>/dev/null | grep 8888" || echo "未监听")
+if [ "$HOOK_PORT_CHECK" = "未监听" ]; then
+    echo "错误：Hook 容器未监听 8888 端口，输出最后 50 行日志："
+    k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
+else
+    echo "Hook 容器已监听 8888 端口："
+    echo "$HOOK_PORT_CHECK"
+fi
+
+# 检查 Deck 容器端口
+echo "检查 Deck 容器端口 (8080)..."
+DECK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "netstat -tuln 2>/dev/null | grep 8080" || echo "未监听")
+if [ "$DECK_PORT_CHECK" = "未监听" ]; then
+    echo "错误：Deck 容器未监听 8080 端口，输出最后 50 行日志："
+    k8s kubectl logs -n $NAMESPACE $DECK_POD --tail=50
+else
+    echo "Deck 容器已监听 8080 端口："
+    echo "$DECK_PORT_CHECK"
+fi
 
 # 验证部署结果
 echo "验证部署结果..."

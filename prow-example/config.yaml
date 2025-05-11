@@ -1,3 +1,4 @@
-plank: {}
-hook:
-  bind-address: "0.0.0.0:8888"
+prow:
+  plank: {}
+  hook:
+    bind_address: "0.0.0.0:8888"
