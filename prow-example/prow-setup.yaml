@@ -1,0 +1,117 @@
+# Hook Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hook
+  namespace: prow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hook
+  template:
+    metadata:
+      labels:
+        app: hook
+    spec:
+      containers:
+      - name: hook
+        image: gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --hmac-secret-file=/etc/hmac/hmac
+        - --github-token-path=/etc/github/github-token
+        - --plugin-config=/etc/plugins/plugins.yaml  # Add plugin-config argument
+        ports:
+        - containerPort: 8888
+        volumeMounts:
+        - name: hmac
+          mountPath: /etc/hmac
+          readOnly: true
+        - name: github-token
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: plugins
+          mountPath: /etc/plugins
+          readOnly: true
+      volumes:
+      - name: hmac
+        secret:
+          secretName: hmac-token
+      - name: github-token
+        secret:
+          secretName: github-token
+      - name: config
+        configMap:
+          name: config
+      - name: plugins
+        configMap:
+          name: plugins
+
+---
+# Hook 服务
+apiVersion: v1
+kind: Service
+metadata:
+  name: hook
+  namespace: prow
+spec:
+  selector:
+    app: hook
+  ports:
+  - port: 8888
+    targetPort: 8888
+    nodePort: 30001
+  type: NodePort
+
+---
+# Deck Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deck
+  namespace: prow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deck
+  template:
+    metadata:
+      labels:
+        app: deck
+    spec:
+      containers:
+      - name: deck
+        image: gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
+        args:
+        - --config-path=/etc/config/config.yaml
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: config
+
+---
+# Deck 服务
+apiVersion: v1
+kind: Service
+metadata:
+  name: deck
+  namespace: prow
+spec:
+  selector:
+    app: deck
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30002
+  type: NodePort

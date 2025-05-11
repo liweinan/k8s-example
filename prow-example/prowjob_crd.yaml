@@ -1,0 +1,77 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: prowjobs.prow.k8s.io
+  annotations:
+    api-approved.kubernetes.io: https://github.com/kubernetes/test-infra/pull/8669
+spec:
+  group: prow.k8s.io
+  names:
+    kind: ProwJob
+    listKind: ProwJobList
+    plural: prowjobs
+    singular: prowjob
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              type:
+                type: string
+                enum:
+                - presubmit
+                - postsubmit
+                - periodic
+                - batch
+              job:
+                type: string
+              refs:
+                type: object
+                properties:
+                  org:
+                    type: string
+                  repo:
+                    type: string
+                  base_ref:
+                    type: string
+                  base_sha:
+                    type: string
+              pod_spec:
+                type: object
+          status:
+            type: object
+            properties:
+              state:
+                type: string
+                enum:
+                - triggered
+                - pending
+                - success
+                - failure
+                - aborted
+                - error
+              startTime:
+                type: string
+                format: date-time
+              completionTime:
+                type: string
+                format: date-time
+              build_id:
+                type: string
+    additionalPrinterColumns:
+    - name: Job
+      type: string
+      jsonPath: .spec.job
+    - name: BuildId
+      type: string
+      jsonPath: .status.build_id
+    - name: Type
+      type: string
+      jsonPath: .spec.type

@@ -1,0 +1,4 @@
+plugins:
+  my-org/my-repo:
+    - trigger
+    - approve
