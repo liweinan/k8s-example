@@ -10,7 +10,7 @@ NAMESPACE="prow"
 PROW_SETUP_FILE="./prow-setup.yaml"
 
 # 定义代理地址
-PROXY="http://localhost:1080"
+PROXY="http://192.168.0.119:1080"
 
 # 定义等待超时时间（秒）
 TIMEOUT=300
@@ -103,9 +103,9 @@ k8s kubectl create configmap -n $NAMESPACE plugins --from-file=plugins.yaml=./pl
 
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
-# 设置代理环境变量
-export HTTP_PROXY=$PROXY
-export HTTPS_PROXY=$PROXY
+# 设置代理环境变量（用于主机拉取镜像）
+export HTTP_PROXY="http://localhost:1080"
+export HTTPS_PROXY="http://localhost:1080"
 
 # 导出镜像
 ctr image export hook.tar gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
@@ -137,10 +137,17 @@ while true; do
     if [ -n "$HOOK_POD" ]; then
         HOOK_STATUS=$(k8s kubectl get pod -n $NAMESPACE $HOOK_POD --no-headers -o custom-columns=":status.phase")
         HOOK_READY=$(k8s kubectl get pod -n $NAMESPACE $HOOK_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
-        if [ "$HOOK_STATUS" = "Running" ] && [ -n "$HOOK_READY" ]; then
+        HOOK_CONDITION=$(k8s kubectl get pod -n $NAMESPACE $HOOK_POD --no-headers -o custom-columns=":status.conditions[?(@.type=='Ready')].status" | grep "False" || true)
+        if [ "$HOOK_STATUS" = "Running" ] && [ -n "$HOOK_READY" ] && [ -z "$HOOK_CONDITION" ]; then
             echo "Hook Pod ($HOOK_POD) 已进入 Running 状态且 Ready"
             break
         else
+            HOOK_CONTAINER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $HOOK_POD --no-headers -o custom-columns=":status.containerStatuses[0].state" | grep "CrashLoopBackOff" || true)
+            if [ -n "$HOOK_CONTAINER_STATUS" ]; then
+                echo "错误：Hook Pod ($HOOK_POD) 处于 CrashLoopBackOff 状态，输出日志："
+                k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
+                exit 1
+            fi
             echo "Hook Pod ($HOOK_POD) 状态: $HOOK_STATUS, Ready: $HOOK_READY，等待中..."
         fi
     else
@@ -163,10 +170,17 @@ while true; do
     if [ -n "$DECK_POD" ]; then
         DECK_STATUS=$(k8s kubectl get pod -n $NAMESPACE $DECK_POD --no-headers -o custom-columns=":status.phase")
         DECK_READY=$(k8s kubectl get pod -n $NAMESPACE $DECK_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
-        if [ "$DECK_STATUS" = "Running" ] && [ -n "$DECK_READY" ]; then
+        DECK_CONDITION=$(k8s kubectl get pod -n $NAMESPACE $DECK_POD --no-headers -o custom-columns=":status.conditions[?(@.type=='Ready')].status" | grep "False" || true)
+        if [ "$DECK_STATUS" = "Running" ] && [ -n "$DECK_READY" ] && [ -z "$DECK_CONDITION" ]; then
             echo "Deck Pod ($DECK_POD) 已进入 Running 状态且 Ready"
             break
         else
+            DECK_CONTAINER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $DECK_POD --no-headers -o custom-columns=":status.containerStatuses[0].state" | grep "CrashLoopBackOff" || true)
+            if [ -n "$DECK_CONTAINER_STATUS" ]; then
+                echo "错误：Deck Pod ($DECK_POD) 处于 CrashLoopBackOff 状态，输出日志："
+                k8s kubectl logs -n $NAMESPACE $DECK_POD --tail=50
+                exit 1
+            fi
             echo "Deck Pod ($DECK_POD) 状态: $DECK_STATUS, Ready: $DECK_READY，等待中..."
         fi
     else

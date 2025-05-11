@@ -22,6 +22,11 @@ spec:
         - --hmac-secret-file=/etc/hmac/hmac
         - --github-token-path=/etc/github/github-token
         - --plugin-config=/etc/plugins/plugins.yaml
+        env:
+        - name: HTTP_PROXY
+          value: "http://192.168.0.119:1080"
+        - name: HTTPS_PROXY
+          value: "http://192.168.0.119:1080"
         ports:
         - containerPort: 8888
         volumeMounts:
