@@ -39,6 +39,21 @@ if [ ! -f "$RBAC_FILE" ]; then
 fi
 k8s kubectl apply -f "$RBAC_FILE"
 
+# 验证 deck ServiceAccount 和 token Secret
+echo "验证 deck ServiceAccount 是否创建..."
+if ! k8s kubectl get serviceaccount -n $NAMESPACE deck --no-headers >/dev/null 2>&1; then
+    echo "错误：deck ServiceAccount 未创建，请检查 prow-rbac.yaml 或集群状态。"
+    k8s kubectl describe serviceaccount -n $NAMESPACE deck || echo "ServiceAccount 不存在。"
+    exit 1
+fi
+
+echo "验证 deck-token Secret 是否创建..."
+if ! k8s kubectl get secret -n $NAMESPACE deck-token --no-headers >/dev/null 2>&1; then
+    echo "错误：deck-token Secret 未创建，请检查 prow-rbac.yaml 或集群状态。"
+    k8s kubectl describe secret -n $NAMESPACE deck-token || echo "Secret 不存在。"
+    exit 1
+fi
+
 # 删除所有 Deployment
 echo "删除所有 Deployment..."
 k8s kubectl delete deployment --all -n $NAMESPACE --ignore-not-found
@@ -109,6 +124,16 @@ k8s kubectl create secret -n $NAMESPACE generic github-token --from-file=github-
 k8s kubectl create configmap -n $NAMESPACE config --from-file=config.yaml=./config.yaml
 k8s kubectl create configmap -n $NAMESPACE plugins --from-file=plugins.yaml=./plugins.yaml
 k8s kubectl create configmap -n $NAMESPACE job-config --from-file=prow-jobs.yaml=./prow-jobs.yaml
+
+# 验证 ConfigMap 是否创建成功
+echo "验证 ConfigMap 是否创建..."
+for CONFIGMAP in config plugins job-config; do
+    if ! k8s kubectl get configmap -n $NAMESPACE $CONFIGMAP --no-headers >/dev/null 2>&1; then
+        echo "错误：ConfigMap $CONFIGMAP 未创建，请检查文件是否存在或集群状态。"
+        k8s kubectl describe configmap -n $NAMESPACE $CONFIGMAP || echo "ConfigMap 不存在。"
+        exit 1
+    fi
+done
 
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
