@@ -109,6 +109,8 @@ spec:
                             type: string
                           author_link:
                             type: string
+                          head_ref:
+                            type: string
                 pod_spec:
                   type: object
                   properties:
@@ -117,6 +119,8 @@ spec:
                       items:
                         type: object
                         properties:
+                          name:
+                            type: string
                           image:
                             type: string
                           command:
@@ -146,6 +150,9 @@ spec:
                                     type: string
                 prowjob_defaults:
                   type: object
+                  properties:
+                    tenant_id:
+                      type: string
             status:
               type: object
               properties:
