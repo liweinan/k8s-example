@@ -108,6 +108,7 @@ k8s kubectl create secret -n $NAMESPACE generic hmac-token --from-file=hmac=./se
 k8s kubectl create secret -n $NAMESPACE generic github-token --from-file=github-token=./alchemy-prow-bot.2025-05-11.private-key.pem
 k8s kubectl create configmap -n $NAMESPACE config --from-file=config.yaml=./config.yaml
 k8s kubectl create configmap -n $NAMESPACE plugins --from-file=plugins.yaml=./plugins.yaml
+k8s kubectl create configmap -n $NAMESPACE job-config --from-file=prow-jobs.yaml=./prow-jobs.yaml
 
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
@@ -140,6 +141,11 @@ ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检�
 # 重新应用 prow-setup.yaml
 echo "重新应用 prow-setup.yaml..."
 k8s kubectl apply -f $PROW_SETUP_FILE
+
+# 更新 Hook Deployment 的 args 和 volumes
+echo "更新 Hook Deployment 的 args 和 volumes..."
+k8s kubectl patch deployment -n $NAMESPACE hook --patch '{"spec":{"template":{"spec":{"containers":[{"name":"hook","args":["--config-path=/etc/config/config.yaml","--plugin-config=/etc/plugins/plugins.yaml","--hmac-secret-file=/etc/hmac/hmac","--github-token-path=/etc/github/github-token","--job-config-path=/etc/job-config/prow-jobs.yaml","--dry-run=false"]}]}}}}'
+k8s kubectl patch deployment -n $NAMESPACE hook --patch '{"spec":{"template":{"spec":{"volumes":[{"name":"job-config","configMap":{"name":"job-config"}}],"containers":[{"name":"hook","volumeMounts":[{"name":"job-config","mountPath":"/etc/job-config","readOnly":true}]}]}}}}'
 
 # 等待 Pod 进入 Running 状态
 echo "等待 Hook 和 Deck Pod 进入 Running 状态..."
@@ -212,7 +218,7 @@ done
 
 # 启动 Hook 容器内的命令并检查端口
 echo "启动 Hook 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
+k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --job-config-path=/etc/job-config/prow-jobs.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
 
 # 等待 Hook 端口 8888 可用
 echo "等待 Hook 端口 8888 可用..."
