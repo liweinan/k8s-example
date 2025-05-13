@@ -23,3 +23,16 @@ presubmits:
               - go
             args:
               - test
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "100Mi"
+              limits:
+                cpu: "500m"
+                memory: "500Mi"
+      trigger: "(?m)^/test(\\s+|$)"
+      rerun_command: "/test"
+      max_concurrency: 10
+      agent: kubernetes
+      cluster: default
+      namespace: prow
