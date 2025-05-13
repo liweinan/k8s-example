@@ -3,6 +3,11 @@ presubmits:
     - name: unit-test
       always_run: true
       decorate: true
+      agent: kubernetes
+      cluster: default
+      max_concurrency: 10
+      trigger: "(?m)^/test(\\s+|$)"
+      rerun_command: "/test"
       decoration_config:
         timeout: 7200000000000  # 2 hours
         grace_period: 15000000000  # 15 seconds
@@ -30,8 +35,3 @@ presubmits:
               limits:
                 cpu: "500m"
                 memory: "500Mi"
-      trigger: "(?m)^/test(\\s+|$)"
-      rerun_command: "/test"
-      max_concurrency: 10
-      agent: kubernetes
-      cluster: default
