@@ -21,7 +21,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - "apk update && apk add curl && /ko-app/hook --config-path=/etc/config/config.yaml --plugin-config=/etc/plugins/plugins.yaml --hmac-secret-file=/etc/hmac/hmac --github-token-path=/etc/github/github-token --job-config-path=/etc/job-config/prow-jobs.yaml --dry-run=false"
+        - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
         env:
         - name: LOGRUS_LEVEL
           value: "debug"

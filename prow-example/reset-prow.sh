@@ -246,6 +246,12 @@ while true; do
     else
         echo "未找到 Deck Pod，等待中..."
         k8s kubectl get pods -n $NAMESPACE -l app=deck
+        # Describe the ReplicaSet to get more details
+        REPLICASET=$(k8s kubectl get replicaset -n $NAMESPACE -l app=deck --no-headers -o custom-columns=":metadata.name" | head -n 1)
+        if [ -n "$REPLICASET" ]; then
+            echo "Deck ReplicaSet 状态："
+            k8s kubectl describe replicaset -n $NAMESPACE $REPLICASET
+        fi
     fi
     sleep 5
     DECK_TIMEOUT_COUNT=$((DECK_TIMEOUT_COUNT + 5))
@@ -253,9 +259,17 @@ while true; do
         echo "错误：等待 Deck Pod 超时（${TIMEOUT}秒），请检查部署状态："
         k8s kubectl get pods -n $NAMESPACE
         k8s kubectl describe deployment -n $NAMESPACE deck
+        REPLICASET=$(k8s kubectl get replicaset -n $NAMESPACE -l app=deck --no-headers -o custom-columns=":metadata.name" | head -n 1)
+        if [ -n "$REPLICASET" ]; then
+            k8s kubectl describe replicaset -n $NAMESPACE $REPLICASET
+        fi
         exit 1
     fi
 done
+
+# 启动 Hook 容器内的命令并检查端口
+echo "启动 Hook 容器内的命令..."
+k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --job-config-path=/etc/job-config/prow-jobs.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
 
 # 等待 Hook 端口 8888 可用
 echo "等待 Hook 端口 8888 可用..."
@@ -271,7 +285,7 @@ while true; do
         HOOK_PORT_TIMEOUT=$((HOOK_PORT_TIMEOUT + 5))
         if [ $HOOK_PORT_TIMEOUT -ge $TIMEOUT ]; then
             echo "错误：等待 Hook 端口 8888 超时（${TIMEOUT}秒），输出日志："
-            k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
+            k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "cat /tmp/hook.log | tail -50"
             exit 1
         fi
     fi
