@@ -35,4 +35,3 @@ presubmits:
       max_concurrency: 10
       agent: kubernetes
       cluster: default
-      namespace: prow
