@@ -20,6 +20,11 @@ TIMEOUT=300
 # 打印开始信息
 echo "开始清理 Prow 服务..."
 
+# 创建 prow 命名空间（如果不存在）
+echo "创建 prow 命名空间（如果不存在）..."
+k8s kubectl get namespace $NAMESPACE &>/dev/null || k8s kubectl create namespace $NAMESPACE
+echo "prow 命名空间已确保存在"
+
 # 删除所有 Deployment
 echo "删除所有 Deployment..."
 k8s kubectl delete deployment --all -n $NAMESPACE --ignore-not-found
@@ -95,6 +100,20 @@ echo "导入镜像到 k8s.io 命名空间..."
 export HTTP_PROXY=$PROXY
 export HTTPS_PROXY=$PROXY
 
+# 拉取镜像
+echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:ko-v20240805-37a08f946..."
+if ! ctr image pull gcr.io/k8s-prow/hook:ko-v20240805-37a08f946; then
+    echo "错误：无法拉取 Hook 镜像 gcr.io/k8s-prow/hook:ko-v20240805-37a08f946，请检查网络、代理设置或镜像是否存在。"
+    exit 1
+fi
+
+echo "拉取 Deck 镜像 gcr.io/k8s-prow/deck:ko-v20240805-37a08f946..."
+if ! ctr image pull gcr.io/k8s-prow/deck:ko-v20240805-37a08f946; then
+    echo "错误：无法拉取 Deck 镜像 gcr.io/k8s-prow/deck:ko-v20240805-37a08f946，请检查网络、代理设置或镜像是否存在。"
+    exit 1
+fi
+
+# 导出镜像
 ctr image export hook.tar gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
 ctr image export deck.tar gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
 ctr -n k8s.io image import hook.tar

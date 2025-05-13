@@ -1,2 +1,5 @@
 plugin_config:
-  plugins: {}
+  plugins:
+    alchemy-studio/my-prow-test-proj:
+      plugins:
+        - trigger

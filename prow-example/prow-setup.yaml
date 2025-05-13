@@ -20,12 +20,8 @@ spec:
         command:
         - /bin/sh
         - -c
-        - "apk update && apk add curl && sleep infinity"
+        - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
         env:
-        - name: HTTP_PROXY
-          value: "http://${PROXY_IP}:1080"  # Will be set dynamically by the script
-        - name: HTTPS_PROXY
-          value: "http://${PROXY_IP}:1080"
         - name: LOGRUS_LEVEL
           value: "debug"
         ports:
@@ -96,7 +92,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - "apk update && apk add curl && sleep infinity"
+        - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
         env:
         - name: LOGRUS_LEVEL
           value: "debug"
