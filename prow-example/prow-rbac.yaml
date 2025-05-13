@@ -10,7 +10,19 @@ rules:
   verbs: ["get", "list", "watch"]
 
 ---
-# RoleBinding to bind the Role to the default ServiceAccount in the prow namespace
+# Role to grant permissions to access ProwJob resources in the default namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prow-deck-default
+  namespace: default
+rules:
+- apiGroups: ["prow.k8s.io"]
+  resources: ["prowjobs"]
+  verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding to bind the Role to the default ServiceAccount in the prow namespace (for prow namespace)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -23,4 +35,20 @@ subjects:
 roleRef:
   kind: Role
   name: prow-deck
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding to bind the Role to the default ServiceAccount in the prow namespace (for default namespace)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prow-deck-default
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: prow
+roleRef:
+  kind: Role
+  name: prow-deck-default
   apiGroup: rbac.authorization.k8s.io
