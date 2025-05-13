@@ -9,8 +9,8 @@ presubmits:
       trigger: "(?m)^/test(\\s+|$)"
       rerun_command: "/test"
       decoration_config:
-        timeout: 7200000000000  # 2 hours
-        grace_period: 15000000000  # 15 seconds
+        timeout: 7200  # 2 hours in seconds
+        grace_period: 15  # 15 seconds
         gcs_configuration:
           bucket: "prow-artifacts"
           path_strategy: "explicit"
