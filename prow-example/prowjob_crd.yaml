@@ -50,9 +50,19 @@ spec:
                   type: object
                   properties:
                     timeout:
-                      type: integer
+                      description: |
+                        Timeout is how long the pod utilities will wait before aborting a job with SIGINT.
+                      anyOf:
+                        - type: integer
+                        - type: string
+                      x-kubernetes-int-or-string: true
                     grace_period:
-                      type: integer
+                      description: |
+                        GracePeriod is how long the pod utilities will wait after sending SIGINT to send SIGKILL when aborting a job. Only applicable if decorating the PodSpec.
+                      anyOf:
+                        - type: integer
+                        - type: string
+                      x-kubernetes-int-or-string: true
                     gcs_configuration:
                       type: object
                       properties:
