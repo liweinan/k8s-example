@@ -13,65 +13,192 @@ spec:
     singular: prowjob
   scope: Namespaced
   versions:
-  - name: v1
-    served: true
-    storage: true
-    schema:
-      openAPIV3Schema:
-        type: object
-        properties:
-          spec:
-            type: object
-            properties:
-              type:
-                type: string
-                enum:
-                - presubmit
-                - postsubmit
-                - periodic
-                - batch
-              job:
-                type: string
-              refs:
-                type: object
-                properties:
-                  org:
-                    type: string
-                  repo:
-                    type: string
-                  base_ref:
-                    type: string
-                  base_sha:
-                    type: string
-              pod_spec:
-                type: object
-          status:
-            type: object
-            properties:
-              state:
-                type: string
-                enum:
-                - triggered
-                - pending
-                - success
-                - failure
-                - aborted
-                - error
-              startTime:
-                type: string
-                format: date-time
-              completionTime:
-                type: string
-                format: date-time
-              build_id:
-                type: string
-    additionalPrinterColumns:
-    - name: Job
-      type: string
-      jsonPath: .spec.job
-    - name: BuildId
-      type: string
-      jsonPath: .status.build_id
-    - name: Type
-      type: string
-      jsonPath: .spec.type
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - presubmit
+                    - postsubmit
+                    - periodic
+                    - batch
+                job:
+                  type: string
+                agent:
+                  type: string
+                cluster:
+                  type: string
+                namespace:
+                  type: string
+                context:
+                  type: string
+                max_concurrency:
+                  type: integer
+                rerun_command:
+                  type: string
+                report:
+                  type: boolean
+                decoration_config:
+                  type: object
+                  properties:
+                    timeout:
+                      type: integer
+                    grace_period:
+                      type: integer
+                    gcs_configuration:
+                      type: object
+                      properties:
+                        bucket:
+                          type: string
+                        path_strategy:
+                          type: string
+                        default_org:
+                          type: string
+                        default_repo:
+                          type: string
+                    utility_images:
+                      type: object
+                      properties:
+                        clonerefs:
+                          type: string
+                        initupload:
+                          type: string
+                        entrypoint:
+                          type: string
+                        sidecar:
+                          type: string
+                refs:
+                  type: object
+                  properties:
+                    org:
+                      type: string
+                    repo:
+                      type: string
+                    base_ref:
+                      type: string
+                    base_sha:
+                      type: string
+                    base_link:
+                      type: string
+                    repo_link:
+                      type: string
+                    pulls:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          number:
+                            type: integer
+                          author:
+                            type: string
+                          sha:
+                            type: string
+                          title:
+                            type: string
+                          link:
+                            type: string
+                          commit_link:
+                            type: string
+                          author_link:
+                            type: string
+                pod_spec:
+                  type: object
+                  properties:
+                    containers:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          image:
+                            type: string
+                          command:
+                            type: array
+                            items:
+                              type: string
+                          args:
+                            type: array
+                            items:
+                              type: string
+                          resources:
+                            type: object
+                            properties:
+                              requests:
+                                type: object
+                                properties:
+                                  cpu:
+                                    type: string
+                                  memory:
+                                    type: string
+                              limits:
+                                type: object
+                                properties:
+                                  cpu:
+                                    type: string
+                                  memory:
+                                    type: string
+                prowjob_defaults:
+                  type: object
+            status:
+              type: object
+              properties:
+                state:
+                  type: string
+                  enum:
+                    - triggered
+                    - pending
+                    - success
+                    - failure
+                    - aborted
+                    - error
+                startTime:
+                  type: string
+                  format: date-time
+                completionTime:
+                  type: string
+                  format: date-time
+                build_id:
+                  type: string
+                description:
+                  type: string
+                url:
+                  type: string
+                pod_name:
+                  type: string
+                pod_revival_count:
+                  type: integer
+      additionalPrinterColumns:
+        - name: Job
+          type: string
+          jsonPath: .spec.job
+        - name: BuildId
+          type: string
+          jsonPath: .status.build_id
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Org
+          type: string
+          jsonPath: .spec.refs.org
+        - name: Repo
+          type: string
+          jsonPath: .spec.refs.repo
+        - name: Pulls
+          type: string
+          jsonPath: .spec.refs.pulls[*].number
+        - name: StartTime
+          type: date
+          jsonPath: .status.startTime
+        - name: CompletionTime
+          type: date
+          jsonPath: .status.completionTime
+        - name: State
+          type: string
+          jsonPath: .status.state
