@@ -14,16 +14,23 @@ spec:
       labels:
         app: hook
     spec:
+      automountServiceAccountToken: true
       containers:
       - name: hook
         image: gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
         command:
         - /bin/sh
         - -c
-        - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
+        - "apk update && apk add curl && /ko-app/hook --config-path=/etc/config/config.yaml --plugin-config=/etc/plugins/plugins.yaml --hmac-secret-file=/etc/hmac/hmac --github-token-path=/etc/github/github-token --job-config-path=/etc/job-config/prow-jobs.yaml --dry-run=false"
         env:
         - name: LOGRUS_LEVEL
           value: "debug"
+        - name: HTTP_PROXY
+          value: "http://${PROXY_IP}:${PROXY_PORT}"
+        - name: HTTPS_PROXY
+          value: "http://${PROXY_IP}:${PROXY_PORT}"
+        - name: NO_PROXY
+          value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
         ports:
         - containerPort: 8888
         volumeMounts:
@@ -39,6 +46,9 @@ spec:
         - name: plugins
           mountPath: /etc/plugins
           readOnly: true
+        - name: job-config
+          mountPath: /etc/job-config
+          readOnly: true
       volumes:
       - name: hmac
         secret:
@@ -52,6 +62,9 @@ spec:
       - name: plugins
         configMap:
           name: plugins
+      - name: job-config
+        configMap:
+          name: job-config
 
 ---
 # Hook Service
@@ -86,6 +99,8 @@ spec:
       labels:
         app: deck
     spec:
+      serviceAccountName: deck
+      automountServiceAccountToken: true
       containers:
       - name: deck
         image: gcr.io/k8s-prow/deck:ko-v20240805-37a08f946

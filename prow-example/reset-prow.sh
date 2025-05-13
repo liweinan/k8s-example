@@ -142,10 +142,20 @@ ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检�
 echo "重新应用 prow-setup.yaml..."
 k8s kubectl apply -f $PROW_SETUP_FILE
 
-# 更新 Hook Deployment 的 args 和 volumes
-echo "更新 Hook Deployment 的 args 和 volumes..."
-k8s kubectl patch deployment -n $NAMESPACE hook --patch '{"spec":{"template":{"spec":{"containers":[{"name":"hook","args":["--config-path=/etc/config/config.yaml","--plugin-config=/etc/plugins/plugins.yaml","--hmac-secret-file=/etc/hmac/hmac","--github-token-path=/etc/github/github-token","--job-config-path=/etc/job-config/prow-jobs.yaml","--dry-run=false"]}]}}}}'
-k8s kubectl patch deployment -n $NAMESPACE hook --patch '{"spec":{"template":{"spec":{"volumes":[{"name":"job-config","configMap":{"name":"job-config"}}],"containers":[{"name":"hook","volumeMounts":[{"name":"job-config","mountPath":"/etc/job-config","readOnly":true}]}]}}}}'
+# 验证 Hook 和 Deck Deployment 是否创建成功
+echo "验证 Hook Deployment 是否创建..."
+if ! k8s kubectl get deployment -n $NAMESPACE hook --no-headers >/dev/null 2>&1; then
+    echo "错误：Hook Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
+    k8s kubectl describe deployment -n $NAMESPACE hook || echo "Deployment 不存在。"
+    exit 1
+fi
+
+echo "验证 Deck Deployment 是否创建..."
+if ! k8s kubectl get deployment -n $NAMESPACE deck --no-headers >/dev/null 2>&1; then
+    echo "错误：Deck Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
+    k8s kubectl describe deployment -n $NAMESPACE deck || echo "Deployment 不存在。"
+    exit 1
+fi
 
 # 等待 Pod 进入 Running 状态
 echo "等待 Hook 和 Deck Pod 进入 Running 状态..."
@@ -167,18 +177,21 @@ while true; do
             if [ -n "$HOOK_CONTAINER_STATUS" ]; then
                 echo "错误：Hook Pod ($HOOK_POD) 处于 CrashLoopBackOff 状态，输出日志："
                 k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
+                k8s kubectl describe pod -n $NAMESPACE $HOOK_POD
                 exit 1
             fi
             echo "Hook Pod ($HOOK_POD) 状态: $HOOK_STATUS, Ready: $HOOK_READY，等待中..."
         fi
     else
         echo "未找到 Hook Pod，等待中..."
+        k8s kubectl get pods -n $NAMESPACE -l app=hook
     fi
     sleep 5
     HOOK_TIMEOUT_COUNT=$((HOOK_TIMEOUT_COUNT + 5))
     if [ $HOOK_TIMEOUT_COUNT -ge $TIMEOUT ]; then
         echo "错误：等待 Hook Pod 超时（${TIMEOUT}秒），请检查部署状态："
         k8s kubectl get pods -n $NAMESPACE
+        k8s kubectl describe deployment -n $NAMESPACE hook
         exit 1
     fi
 done
@@ -200,25 +213,24 @@ while true; do
             if [ -n "$DECK_CONTAINER_STATUS" ]; then
                 echo "错误：Deck Pod ($DECK_POD) 处于 CrashLoopBackOff 状态，输出日志："
                 k8s kubectl logs -n $NAMESPACE $DECK_POD --tail=50
+                k8s kubectl describe pod -n $NAMESPACE $DECK_POD
                 exit 1
             fi
             echo "Deck Pod ($DECK_POD) 状态: $DECK_STATUS, Ready: $DECK_READY，等待中..."
         fi
     else
         echo "未找到 Deck Pod，等待中..."
+        k8s kubectl get pods -n $NAMESPACE -l app=deck
     fi
     sleep 5
     DECK_TIMEOUT_COUNT=$((DECK_TIMEOUT_COUNT + 5))
     if [ $DECK_TIMEOUT_COUNT -ge $TIMEOUT ]; then
         echo "错误：等待 Deck Pod 超时（${TIMEOUT}秒），请检查部署状态："
         k8s kubectl get pods -n $NAMESPACE
+        k8s kubectl describe deployment -n $NAMESPACE deck
         exit 1
     fi
 done
-
-# 启动 Hook 容器内的命令并检查端口
-echo "启动 Hook 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --job-config-path=/etc/job-config/prow-jobs.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
 
 # 等待 Hook 端口 8888 可用
 echo "等待 Hook 端口 8888 可用..."
@@ -234,7 +246,7 @@ while true; do
         HOOK_PORT_TIMEOUT=$((HOOK_PORT_TIMEOUT + 5))
         if [ $HOOK_PORT_TIMEOUT -ge $TIMEOUT ]; then
             echo "错误：等待 Hook 端口 8888 超时（${TIMEOUT}秒），输出日志："
-            k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "cat /tmp/hook.log | tail -50"
+            k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
             exit 1
         fi
     fi
