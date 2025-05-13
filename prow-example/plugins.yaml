@@ -1,6 +1,2 @@
 plugin_config:
-  plugins:
-    liweinan/my-prow-test-proj:
-      plugins:
-        - trigger  # 允许使用 /test 命令触发测试
-        - approve  # 允许使用 /approve 命令批准 PR
+  plugins: {}

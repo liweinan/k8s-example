@@ -17,16 +17,15 @@ spec:
       containers:
       - name: hook
         image: gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
-        args:
-        - --config-path=/etc/config/config.yaml
-        - --hmac-secret-file=/etc/hmac/hmac
-        - --github-token-path=/etc/github/github-token
-        - --plugin-config=/etc/plugins/plugins.yaml
+        command:
+        - /bin/sh
+        - -c
+        - "apk update && apk add curl && sleep infinity"
         env:
         - name: HTTP_PROXY
-          value: "http://192.168.0.119:1080"
+          value: "http://${PROXY_IP}:1080"  # Will be set dynamically by the script
         - name: HTTPS_PROXY
-          value: "http://192.168.0.119:1080"
+          value: "http://${PROXY_IP}:1080"
         - name: LOGRUS_LEVEL
           value: "debug"
         ports:
@@ -59,7 +58,7 @@ spec:
           name: plugins
 
 ---
-# Hook 服务
+# Hook Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -94,8 +93,13 @@ spec:
       containers:
       - name: deck
         image: gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
-        args:
-        - --config-path=/etc/config/config.yaml
+        command:
+        - /bin/sh
+        - -c
+        - "apk update && apk add curl && sleep infinity"
+        env:
+        - name: LOGRUS_LEVEL
+          value: "debug"
         ports:
         - containerPort: 8080
         volumeMounts:
@@ -108,7 +112,7 @@ spec:
           name: config
 
 ---
-# Deck 服务
+# Deck Service
 apiVersion: v1
 kind: Service
 metadata:

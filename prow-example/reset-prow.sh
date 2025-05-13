@@ -9,8 +9,10 @@ NAMESPACE="prow"
 # 定义 prow-setup.yaml 文件路径
 PROW_SETUP_FILE="./prow-setup.yaml"
 
-# 定义代理地址
-PROXY="http://192.168.0.119:1080"
+# 定义代理地址（默认值）
+PROXY_IP=${1:-192.168.0.119}
+PROXY_PORT=1080
+PROXY="http://${PROXY_IP}:${PROXY_PORT}"
 
 # 定义等待超时时间（秒）
 TIMEOUT=300
@@ -32,7 +34,6 @@ k8s kubectl delete pod --all -n $NAMESPACE --ignore-not-found
 
 # 删除所有 ConfigMap（排除 kube-root-ca.crt）
 echo "删除所有 ConfigMap（排除 kube-root-ca.crt）..."
-# 获取 ConfigMap 列表，排除 kube-root-ca.crt，然后删除
 CONFIGMAPS=$(k8s kubectl get configmap -n $NAMESPACE --no-headers -o custom-columns=":metadata.name" | grep -v kube-root-ca.crt || true)
 if [ -n "$CONFIGMAPS" ]; then
     echo "删除 ConfigMap：$CONFIGMAPS"
@@ -58,28 +59,23 @@ k8s kubectl get crd prowjobs.prow.k8s.io --ignore-not-found
 
 # 安装 Prow CRD
 echo "应用本地 Prow CRD..."
-# 假设 prowjob_crd.yaml 已手动创建并位于当前目录
 CRD_FILE="./prowjob_crd.yaml"
 
-# 验证 CRD 文件是否存在
 if [ ! -f "$CRD_FILE" ]; then
     echo "错误：$CRD_FILE 文件不存在，请确保已创建该文件。"
     exit 1
 fi
 
-# 验证 CRD 文件是否有效
 if [ ! -s "$CRD_FILE" ]; then
     echo "错误：$CRD_FILE 文件为空，请检查文件内容。"
     exit 1
 fi
 
-# 检查文件内容是否包含 apiVersion 和 kind
 if ! grep -q "apiVersion: apiextensions.k8s.io/v1" "$CRD_FILE" || ! grep -q "kind: CustomResourceDefinition" "$CRD_FILE"; then
     echo "错误：$CRD_FILE 文件内容无效，缺少 apiVersion 或 kind。"
     exit 1
 fi
 
-# 应用 CRD
 k8s kubectl apply -f "$CRD_FILE"
 
 # 验证 CRD 安装
@@ -89,36 +85,22 @@ k8s kubectl get crd prowjobs.prow.k8s.io
 # 重新创建必要的 Secret 和 ConfigMap
 echo "重新创建必要的 Secret 和 ConfigMap..."
 
-# 创建 hmac-token Secret
 k8s kubectl create secret -n $NAMESPACE generic hmac-token --from-file=hmac=./secret
-
-# 创建 github-token Secret（修复键名）
 k8s kubectl create secret -n $NAMESPACE generic github-token --from-file=github-token=./alchemy-prow-bot.2025-05-11.private-key.pem
-
-# 创建 config ConfigMap
 k8s kubectl create configmap -n $NAMESPACE config --from-file=config.yaml=./config.yaml
-
-# 创建 plugins ConfigMap
 k8s kubectl create configmap -n $NAMESPACE plugins --from-file=plugins.yaml=./plugins.yaml
 
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
-# 设置代理环境变量（用于主机拉取镜像）
-export HTTP_PROXY="http://localhost:1080"
-export HTTPS_PROXY="http://localhost:1080"
+export HTTP_PROXY=$PROXY
+export HTTPS_PROXY=$PROXY
 
-# 导出镜像
 ctr image export hook.tar gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
 ctr image export deck.tar gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
-
-# 导入到 k8s.io 命名空间
 ctr -n k8s.io image import hook.tar
 ctr -n k8s.io image import deck.tar
-
-# 清理临时文件
 rm hook.tar deck.tar
 
-# 验证镜像是否导入成功
 echo "验证镜像是否导入到 k8s.io 命名空间..."
 ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检查 ctr 命令是否成功执行"
 
@@ -195,27 +177,53 @@ while true; do
     fi
 done
 
-# 检查 Hook 容器端口
-echo "检查 Hook 容器端口 (8888)..."
-HOOK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "netstat -tuln 2>/dev/null | grep 8888" || echo "未监听")
-if [ "$HOOK_PORT_CHECK" = "未监听" ]; then
-    echo "错误：Hook 容器未监听 8888 端口，输出最后 50 行日志："
-    k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
-else
-    echo "Hook 容器已监听 8888 端口："
-    echo "$HOOK_PORT_CHECK"
-fi
+# 启动 Hook 容器内的命令并检查端口
+echo "启动 Hook 容器内的命令..."
+k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --dry-run=false &"
 
-# 检查 Deck 容器端口
-echo "检查 Deck 容器端口 (8080)..."
-DECK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "netstat -tuln 2>/dev/null | grep 8080" || echo "未监听")
-if [ "$DECK_PORT_CHECK" = "未监听" ]; then
-    echo "错误：Deck 容器未监听 8080 端口，输出最后 50 行日志："
-    k8s kubectl logs -n $NAMESPACE $DECK_POD --tail=50
-else
-    echo "Deck 容器已监听 8080 端口："
-    echo "$DECK_PORT_CHECK"
-fi
+# 等待 Hook 端口 8888 可用
+echo "等待 Hook 端口 8888 可用..."
+HOOK_PORT_TIMEOUT=0
+while true; do
+    HOOK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "curl -s -o /dev/null -w '%{http_code}' http://localhost:8888/hook" || echo "未监听")
+    if [ "$HOOK_PORT_CHECK" != "未监听" ]; then
+        echo "Hook 容器已监听 8888 端口，HTTP 返回码: $HOOK_PORT_CHECK"
+        break
+    else
+        echo "Hook 端口 8888 未监听，等待中..."
+        sleep 5
+        HOOK_PORT_TIMEOUT=$((HOOK_PORT_TIMEOUT + 5))
+        if [ $HOOK_PORT_TIMEOUT -ge $TIMEOUT ]; then
+            echo "错误：等待 Hook 端口 8888 超时（${TIMEOUT}秒），输出日志："
+            k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
+            exit 1
+        fi
+    fi
+done
+
+# 启动 Deck 容器内的命令并检查端口
+echo "启动 Deck 容器内的命令..."
+k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "export LOGRUS_LEVEL=debug && /ko-app/deck --config-path=/etc/config/config.yaml &"
+
+# 等待 Deck 端口 8080 可用
+echo "等待 Deck 端口 8080 可用..."
+DECK_PORT_TIMEOUT=0
+while true; do
+    DECK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080" || echo "未监听")
+    if [ "$DECK_PORT_CHECK" != "未监听" ]; then
+        echo "Deck 容器已监听 8080 端口，HTTP 返回码: $DECK_PORT_CHECK"
+        break
+    else
+        echo "Deck 端口 8080 未监听，等待中..."
+        sleep 5
+        DECK_PORT_TIMEOUT=$((DECK_PORT_TIMEOUT + 5))
+        if [ $DECK_PORT_TIMEOUT -ge $TIMEOUT ]; then
+            echo "错误：等待 Deck 端口 8080 超时（${TIMEOUT}秒），输出日志："
+            k8s kubectl logs -n $NAMESPACE $DECK_POD --tail=50
+            exit 1
+        fi
+    fi
+done
 
 # 验证部署结果
 echo "验证部署结果..."
