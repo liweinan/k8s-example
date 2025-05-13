@@ -233,7 +233,7 @@ done
 
 # 启动 Deck 容器内的命令并检查端口
 echo "启动 Deck 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/deck --config-path=/etc/config/config.yaml --prowjob-namespace=prow > /tmp/deck.log 2>&1 &)"
+k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/deck --config-path=/etc/config/config.yaml  > /tmp/deck.log 2>&1 &)"
 
 # 等待 Deck 端口 8080 可用
 echo "等待 Deck 端口 8080 可用..."

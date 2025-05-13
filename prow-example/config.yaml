@@ -4,14 +4,18 @@ prow:
   pod_namespace: "prow"
   plank:
     job_url_template: 'https://prow.example.com/view/{{.Spec.Job}}/{{.Status.BuildID}}'
-  hook:
-    bind_address: "0.0.0.0:8888"
-    github_app_id: "1263514"
-    github_app_private_key_path: "/etc/github/github-token"
-    hmac_token_path: "/etc/hmac/hmac"
+  github:
+    # GitHub App configuration
+    app_id: "1263514"
+    app_private_key_path: "/etc/github/github-token"
+    # Hook configuration
+    hook_url: "https://prow.example.com/hook"  # Add this - it's required
+    hmac_secret_file: "/etc/hmac/hmac"  # Changed from hmac_token_path
+    # Optional: specify the GitHub API endpoint if not using github.com
+    # endpoint: "https://api.github.com"
   pod_pending_timeout: 15m
   pod_unscheduled_timeout: 5m
-  deck:  # Restore Deck configuration
+  deck:
     deck_instances: 1
     spyglass:
       size_limit: 100000000
