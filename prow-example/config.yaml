@@ -26,3 +26,7 @@ prow:
     resync_period: 1h
     max_prowjob_age: 168h
     max_pod_age: 24h
+  trigger:
+    trusted_apps:
+      - liweinan/my-prow-test-proj
+    join_org_url: https://github.com/orgs/liweinan/people
