@@ -1,8 +1,6 @@
 plugins:
-  alchemy-studio/my-prow-test-proj:
+  liweinan/my-prow-test-proj:
     plugins:
-      # Add other plugins you want to enable, for example:
       - approve
       - lgtm
       - trigger
-

@@ -3,19 +3,26 @@ prow:
   prowjob_namespace: "prow"
   pod_namespace: "prow"
   plank:
-    job_url_template: 'https://prow.example.com/view/{{.Spec.Job}}/{{.Status.BuildID}}'
+    job_url_template: "https://deck.prow.moicen.com/view/{{.Spec.Job}}/{{.Status.BuildID}}"
   github:
-    # GitHub App configuration
     app_id: "1263514"
     app_private_key_path: "/etc/github/github-token"
-    # Hook configuration
-    hook_url: "https://prow.example.com/hook"  # Add this - it's required
-    hmac_secret_file: "/etc/hmac/hmac"  # Changed from hmac_token_path
-    # Optional: specify the GitHub API endpoint if not using github.com
-    # endpoint: "https://api.github.com"
+    hook_url: "https://hook.prow.moicen.com/hook"
+    hmac_secret_file: "/etc/hmac/hmac"
   pod_pending_timeout: 15m
   pod_unscheduled_timeout: 5m
   deck:
     deck_instances: 1
     spyglass:
       size_limit: 100000000
+  tide:
+    queries:
+      - repos:
+          - liweinan/my-prow-test-proj
+        labels:
+          - approved
+          - lgtm
+  sinker:
+    resync_period: 1h
+    max_prowjob_age: 168h
+    max_pod_age: 24h
