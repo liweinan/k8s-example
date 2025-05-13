@@ -17,8 +17,11 @@ PROXY_IP=${1:-192.168.0.119}
 PROXY_PORT=1080
 PROXY="http://${PROXY_IP}:${PROXY_PORT}"
 
+# 定义 NO_PROXY 设置，排除 Kubernetes API 服务器和服务 CIDR
+NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
 # 定义等待超时时间（秒）
-TIMEOUT=300
+TIMEOUT=600  # 10 minutes to give Deck more time to start
 
 # 打印开始信息
 echo "开始清理 Prow 服务..."
@@ -209,7 +212,7 @@ done
 
 # 启动 Hook 容器内的命令并检查端口
 echo "启动 Hook 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
+k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
 
 # 等待 Hook 端口 8888 可用
 echo "等待 Hook 端口 8888 可用..."
@@ -233,7 +236,7 @@ done
 
 # 启动 Deck 容器内的命令并检查端口
 echo "启动 Deck 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/deck --config-path=/etc/config/config.yaml  > /tmp/deck.log 2>&1 &)"
+k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/deck --config-path=/etc/config/config.yaml > /tmp/deck.log 2>&1 &)"
 
 # 等待 Deck 端口 8080 可用
 echo "等待 Deck 端口 8080 可用..."
