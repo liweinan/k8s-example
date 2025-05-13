@@ -1,22 +1,26 @@
+# Role to grant permissions to access ProwJob resources in the prow namespace
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  name: prow-viewer
+  name: prow-deck
+  namespace: prow
 rules:
 - apiGroups: ["prow.k8s.io"]
   resources: ["prowjobs"]
   verbs: ["get", "list", "watch"]
 
 ---
+# RoleBinding to bind the Role to the default ServiceAccount in the prow namespace
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
-  name: prow-viewer-binding
+  name: prow-deck
+  namespace: prow
 subjects:
 - kind: ServiceAccount
   name: default
   namespace: prow
 roleRef:
-  kind: ClusterRole
-  name: prow-viewer
+  kind: Role
+  name: prow-deck
   apiGroup: rbac.authorization.k8s.io

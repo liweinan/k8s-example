@@ -9,6 +9,9 @@ NAMESPACE="prow"
 # 定义 prow-setup.yaml 文件路径
 PROW_SETUP_FILE="./prow-setup.yaml"
 
+# 定义 RBAC 文件路径
+RBAC_FILE="./prow-rbac.yaml"
+
 # 定义代理地址（默认值）
 PROXY_IP=${1:-192.168.0.119}
 PROXY_PORT=1080
@@ -24,6 +27,14 @@ echo "开始清理 Prow 服务..."
 echo "创建 prow 命名空间（如果不存在）..."
 k8s kubectl get namespace $NAMESPACE &>/dev/null || k8s kubectl create namespace $NAMESPACE
 echo "prow 命名空间已确保存在"
+
+# 应用 RBAC 配置
+echo "应用 RBAC 配置..."
+if [ ! -f "$RBAC_FILE" ]; then
+    echo "错误：$RBAC_FILE 文件不存在，请确保已创建该文件。"
+    exit 1
+fi
+k8s kubectl apply -f "$RBAC_FILE"
 
 # 删除所有 Deployment
 echo "删除所有 Deployment..."
@@ -198,14 +209,14 @@ done
 
 # 启动 Hook 容器内的命令并检查端口
 echo "启动 Hook 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --dry-run=false &"
+k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
 
 # 等待 Hook 端口 8888 可用
 echo "等待 Hook 端口 8888 可用..."
 HOOK_PORT_TIMEOUT=0
 while true; do
     HOOK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "curl -s -o /dev/null -w '%{http_code}' http://localhost:8888/hook" || echo "未监听")
-    if [ "$HOOK_PORT_CHECK" != "未监听" ]; then
+    if [ "$HOOK_PORT_CHECK" != "未监听" ] && [ "$HOOK_PORT_CHECK" != "000" ]; then
         echo "Hook 容器已监听 8888 端口，HTTP 返回码: $HOOK_PORT_CHECK"
         break
     else
@@ -214,7 +225,7 @@ while true; do
         HOOK_PORT_TIMEOUT=$((HOOK_PORT_TIMEOUT + 5))
         if [ $HOOK_PORT_TIMEOUT -ge $TIMEOUT ]; then
             echo "错误：等待 Hook 端口 8888 超时（${TIMEOUT}秒），输出日志："
-            k8s kubectl logs -n $NAMESPACE $HOOK_POD --tail=50
+            k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "cat /tmp/hook.log | tail -50"
             exit 1
         fi
     fi
@@ -222,14 +233,14 @@ done
 
 # 启动 Deck 容器内的命令并检查端口
 echo "启动 Deck 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "export LOGRUS_LEVEL=debug && /ko-app/deck --config-path=/etc/config/config.yaml &"
+k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export LOGRUS_LEVEL=debug && /ko-app/deck --config-path=/etc/config/config.yaml --prowjob-namespace=prow > /tmp/deck.log 2>&1 &)"
 
 # 等待 Deck 端口 8080 可用
 echo "等待 Deck 端口 8080 可用..."
 DECK_PORT_TIMEOUT=0
 while true; do
     DECK_PORT_CHECK=$(k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080" || echo "未监听")
-    if [ "$DECK_PORT_CHECK" != "未监听" ]; then
+    if [ "$DECK_PORT_CHECK" != "未监听" ] && [ "$DECK_PORT_CHECK" != "000" ]; then
         echo "Deck 容器已监听 8080 端口，HTTP 返回码: $DECK_PORT_CHECK"
         break
     else
@@ -238,7 +249,7 @@ while true; do
         DECK_PORT_TIMEOUT=$((DECK_PORT_TIMEOUT + 5))
         if [ $DECK_PORT_TIMEOUT -ge $TIMEOUT ]; then
             echo "错误：等待 Deck 端口 8080 超时（${TIMEOUT}秒），输出日志："
-            k8s kubectl logs -n $NAMESPACE $DECK_POD --tail=50
+            k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "cat /tmp/deck.log | tail -50"
             exit 1
         fi
     fi
