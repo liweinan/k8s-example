@@ -6,6 +6,14 @@ metadata:
   namespace: prow
 
 ---
+# ServiceAccount for Hook
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hook
+  namespace: prow
+
+---
 # Secret for Deck ServiceAccount token
 apiVersion: v1
 kind: Secret
@@ -41,6 +49,30 @@ rules:
   verbs: ["get", "list", "watch"]
 
 ---
+# Role for Hook to manage ProwJobs in prow namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prow-hook
+  namespace: prow
+rules:
+- apiGroups: ["prow.k8s.io"]
+  resources: ["prowjobs"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+---
+# Role for Hook to manage ProwJobs in default namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prow-hook-default
+  namespace: default
+rules:
+- apiGroups: ["prow.k8s.io"]
+  resources: ["prowjobs"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+---
 # RoleBinding to bind the Role to the deck ServiceAccount in the prow namespace (for prow namespace)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -70,4 +102,36 @@ subjects:
 roleRef:
   kind: Role
   name: prow-deck-default
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding to bind the Role to the hook ServiceAccount in the prow namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prow-hook
+  namespace: prow
+subjects:
+- kind: ServiceAccount
+  name: hook
+  namespace: prow
+roleRef:
+  kind: Role
+  name: prow-hook
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding to bind the Role to the hook ServiceAccount in the default namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prow-hook-default
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: hook
+  namespace: prow
+roleRef:
+  kind: Role
+  name: prow-hook-default
   apiGroup: rbac.authorization.k8s.io
