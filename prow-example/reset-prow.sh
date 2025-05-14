@@ -252,6 +252,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 func main() {
@@ -299,6 +300,8 @@ func main() {
 			Namespace: "default",
 		},
 		Spec: corev1.PodSpec{
+			ServiceAccountName: "plank",
+			AutomountServiceAccountToken: pointer.Bool(true),
 			Containers: []corev1.Container{
 				{
 					Name:  "test",
@@ -306,6 +309,42 @@ func main() {
 					Command: []string{
 						"sleep",
 						"3600",
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "HTTP_PROXY",
+							Value: "http://192.168.0.123:1080",
+						},
+						{
+							Name:  "HTTPS_PROXY",
+							Value: "http://192.168.0.123:1080",
+						},
+						{
+							Name:  "NO_PROXY",
+							Value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1",
+						},
+						{
+							Name:  "KUBECONFIG",
+							Value: "/etc/kubeconfig/config",
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "kubeconfig",
+							MountPath: "/etc/kubeconfig",
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "kubeconfig",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "kubeconfig",
+							DefaultMode: pointer.Int32(420),
+						},
 					},
 				},
 			},
@@ -653,7 +692,7 @@ done
 echo "启动 Prow Controller Manager 容器内的命令..."
 k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml --kubeconfig=/etc/kubeconfig/config > /tmp/controller.log 2>&1 &)"
 
-# 复制 pod-test 二进制文件到 Pod Test 容器并执行
+# 复制 pod-test 二进制文件到 Pod Test 容器
 echo "复制 pod-test 二进制文件到 Pod Test 容器..."
 k8s kubectl cp /tmp/pod-test/pod-test $NAMESPACE/$POD_TEST_POD:/tmp/pod-test
 
