@@ -393,7 +393,7 @@ fi
 ctr image export hook.tar gcr.io/k8s-prow/hook:latest
 ctr image export deck.tar gcr.io/k8s-prow/deck:latest
 ctr image export controller.tar gcr.io/k8s-prow/prow-controller-manager:latest
-ctr image export pod-test.tar golang:1.21
+ctr image export pod-test.tar docker.io/library/golang:1.21
 ctr -n k8s.io image import hook.tar
 ctr -n k8s.io image import deck.tar
 ctr -n k8s.io image import controller.tar
