@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hook
-  namespace: prow
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -73,7 +73,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: hook
-  namespace: prow
+  namespace: default
 spec:
   selector:
     app: hook
@@ -89,7 +89,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: deck
-  namespace: prow
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -129,7 +129,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: deck
-  namespace: prow
+  namespace: default
 spec:
   selector:
     app: deck
@@ -145,7 +145,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: prow-controller-manager
-  namespace: prow
+  namespace: default
 spec:
   replicas: 1
   selector:

@@ -3,8 +3,8 @@
 # 设置脚本为出错时退出
 set -e
 
-# 定义 prow 命名空间
-NAMESPACE="prow"
+# 定义 default 命名空间
+NAMESPACE="default"
 
 # 定义 prow-setup.yaml 文件路径
 PROW_SETUP_FILE="./prow-setup.yaml"
@@ -25,11 +25,6 @@ TIMEOUT=600  # 10 minutes to give Deck more time to start
 
 # 打印开始信息
 echo "开始清理 Prow 服务..."
-
-# 创建 prow 命名空间（如果不存在）
-echo "创建 prow 命名空间（如果不存在）..."
-k8s kubectl get namespace $NAMESPACE &>/dev/null || k8s kubectl create namespace $NAMESPACE
-echo "prow 命名空间已确保存在"
 
 # 应用 RBAC 配置
 echo "应用 RBAC 配置..."
@@ -381,7 +376,7 @@ done
 
 # 启动 Prow Controller Manager 容器内的命令
 echo "启动 Prow Controller Manager 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml --leader-election-namespace=$NAMESPACE > /tmp/controller.log 2>&1 &)"
+k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml > /tmp/controller.log 2>&1 &)"
 
 # 验证部署结果
 echo "验证部署结果..."
