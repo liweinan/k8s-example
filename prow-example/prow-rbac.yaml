@@ -68,7 +68,7 @@ rules:
     verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
 
 ---
-# Role for Plank to manage ProwJobs, Pods, and Leases in the default namespace
+# Role for Plank to manage ProwJobs, Pods, Leases, and Events in the default namespace
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -84,6 +84,9 @@ rules:
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
     verbs: ["get", "create", "update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
 
 ---
 # RoleBinding to bind the Role to the deck ServiceAccount in the default namespace
