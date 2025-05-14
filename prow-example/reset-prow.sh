@@ -179,6 +179,185 @@ for CONFIGMAP in config plugins job-config; do
     fi
 done
 
+# 构建 pod-test 二进制文件
+echo "构建 pod-test 二进制文件..."
+# 创建临时目录并复制 pod-test 文件
+mkdir -p /tmp/pod-test
+cat <<EOF > /tmp/pod-test/go.mod
+module pod-test
+
+go 1.21
+
+require (
+	k8s.io/api v0.29.2
+	k8s.io/apimachinery v0.29.2
+	k8s.io/client-go v0.29.2
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
+	github.com/go-openapi/jsonpointer v0.19.6 // indirect
+	github.com/go-openapi/jsonreference v0.20.2 // indirect
+	github.com/go-openapi/swag v0.22.3 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/gnostic-models v0.6.8 // indirect
+	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
+	github.com/imdario/mergo v0.3.6 // indirect
+	github.com/josharian/intern v1.0.0 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
+	golang.org/x/net v0.19.0 // indirect
+	golang.org/x/oauth2 v0.10.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/time v0.3.0 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/klog/v2 v2.110.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
+	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
+)
+EOF
+cat <<EOF > /tmp/pod-test/pod-test.go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
+)
+
+func main() {
+	// Create a kubeconfig similar to Plank's
+	kubeconfig := api.Config{
+		Clusters: map[string]*api.Cluster{
+			"default": {
+				Server:               "https://10.152.183.1:443",
+				CertificateAuthority: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+			},
+		},
+		Contexts: map[string]*api.Context{
+			"default-context": {
+				Cluster:   "default",
+				AuthInfo:  "plank",
+				Namespace: "default",
+			},
+		},
+		CurrentContext: "default-context",
+		AuthInfos: map[string]*api.AuthInfo{
+			"plank": {
+				TokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+			},
+		},
+	}
+
+	// Convert to clientcmd.Config
+	clientConfig := clientcmd.NewDefaultClientConfig(kubeconfig, &clientcmd.ConfigOverrides{})
+
+	// Create the clientset
+	config, err := clientConfig.ClientConfig()
+	if err != nil {
+		log.Fatalf("Error creating client config: %v", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("Error creating clientset: %v", err)
+	}
+
+	// Create a test pod
+	testPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-" + time.Now().Format("20060102150405"),
+			Namespace: "default",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "test",
+					Image: "busybox",
+					Command: []string{
+						"sleep",
+						"3600",
+					},
+				},
+			},
+		},
+	}
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Create the pod
+	fmt.Printf("Creating pod %s...\n", testPod.Name)
+	createdPod, err := clientset.CoreV1().Pods("default").Create(ctx, testPod, metav1.CreateOptions{})
+	if err != nil {
+		log.Fatalf("Error creating pod: %v", err)
+	}
+	fmt.Printf("Pod created: %s\n", createdPod.Name)
+
+	// Set up a watch for the pod
+	watch, err := clientset.CoreV1().Pods("default").Watch(ctx, metav1.SingleObject(metav1.ObjectMeta{
+		Name:      createdPod.Name,
+		Namespace: "default",
+	}))
+	if err != nil {
+		log.Fatalf("Error setting up watch: %v", err)
+	}
+	defer watch.Stop()
+
+	// Wait for the pod to appear in the cache
+	fmt.Println("Waiting for pod to appear in cache...")
+	startTime := time.Now()
+	for {
+		select {
+		case event, ok := <-watch.ResultChan():
+			if !ok {
+				log.Fatalf("Watch channel closed")
+			}
+			if event.Type == "ADDED" || event.Type == "MODIFIED" {
+				pod := event.Object.(*corev1.Pod)
+				fmt.Printf("Pod %s appeared in cache after %v\n", pod.Name, time.Since(startTime))
+				return
+			}
+		case <-ctx.Done():
+			log.Fatalf("Timeout waiting for pod to appear in cache after %v", time.Since(startTime))
+		}
+	}
+}
+EOF
+cd /tmp/pod-test
+go mod tidy
+go build -o pod-test pod-test.go
+cd -
+if [ ! -f "/tmp/pod-test/pod-test" ]; then
+    echo "错误：无法构建 pod-test 二进制文件，请检查 Go 环境和 pod-test.go 文件。"
+    exit 1
+fi
+
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
 export HTTP_PROXY=$PROXY
@@ -203,23 +382,32 @@ if ! ctr image pull gcr.io/k8s-prow/prow-controller-manager:latest; then
     exit 1
 fi
 
+# 拉取 golang:1.21 镜像（用于 pod-test container）
+echo "拉取 golang:1.21 镜像..."
+if ! ctr image pull golang:1.21; then
+    echo "错误：无法拉取 golang:1.21 镜像，请检查网络、代理设置或镜像是否存在。"
+    exit 1
+fi
+
 # 导出镜像
 ctr image export hook.tar gcr.io/k8s-prow/hook:latest
 ctr image export deck.tar gcr.io/k8s-prow/deck:latest
 ctr image export controller.tar gcr.io/k8s-prow/prow-controller-manager:latest
+ctr image export pod-test.tar golang:1.21
 ctr -n k8s.io image import hook.tar
 ctr -n k8s.io image import deck.tar
 ctr -n k8s.io image import controller.tar
-rm hook.tar deck.tar controller.tar
+ctr -n k8s.io image import pod-test.tar
+rm hook.tar deck.tar controller.tar pod-test.tar
 
 echo "验证镜像是否导入到 k8s.io 命名空间..."
-ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检查 ctr 命令是否成功执行"
+ctr -n k8s.io image ls | grep -E 'gcr.io/k8s-prow|docker.io/library/golang' || echo "镜像未找到，请检查 ctr 命令是否成功执行"
 
 # 重新应用 prow-setup.yaml
 echo "重新应用 prow-setup.yaml..."
 k8s kubectl apply -f $PROW_SETUP_FILE
 
-# 验证 Hook, Deck, 和 Prow Controller Manager Deployment 是否创建成功
+# 验证 Hook, Deck, Prow Controller Manager, 和 Pod Test Deployment 是否创建成功
 echo "验证 Hook Deployment 是否创建..."
 if ! k8s kubectl get deployment -n $NAMESPACE hook --no-headers >/dev/null 2>&1; then
     echo "错误：Hook Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
@@ -241,8 +429,15 @@ if ! k8s kubectl get deployment -n $NAMESPACE prow-controller-manager --no-heade
     exit 1
 fi
 
+echo "验证 Pod Test Deployment 是否创建..."
+if ! k8s kubectl get deployment -n $NAMESPACE pod-test --no-headers >/dev/null 2>&1; then
+    echo "错误：Pod Test Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
+    k8s kubectl describe deployment -n $NAMESPACE pod-test || echo "Deployment 不存在。"
+    exit 1
+fi
+
 # 等待 Pod 进入 Running 状态
-echo "等待 Hook、Deck 和 Prow Controller Manager Pod 进入 Running 状态..."
+echo "等待 Hook、Deck、Prow Controller Manager 和 Pod Test Pod 进入 Running 状态..."
 
 # 等待 Hook Pod
 echo "等待 Hook Pod..."
@@ -352,6 +547,42 @@ while true; do
     fi
 done
 
+# 等待 Pod Test Pod
+echo "等待 Pod Test Pod..."
+POD_TEST_TIMEOUT_COUNT=0
+while true; do
+    POD_TEST_POD=$(k8s kubectl get pods -n $NAMESPACE -l app=pod-test --no-headers -o custom-columns=":metadata.name" | head -n 1)
+    if [ -n "$POD_TEST_POD" ]; then
+        POD_TEST_STATUS=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.phase")
+        POD_TEST_READY=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
+        POD_TEST_CONDITION=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.conditions[?(@.type=='Ready')].status" | grep "False" || true)
+        if [ "$POD_TEST_STATUS" = "Running" ] && [ -n "$POD_TEST_READY" ] && [ -z "$POD_TEST_CONDITION" ]; then
+            echo "Pod Test Pod ($POD_TEST_POD) 已进入 Running 状态且 Ready"
+            break
+        else
+            POD_TEST_CONTAINER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.containerStatuses[0].state" | grep "CrashLoopBackOff" || true)
+            if [ -n "$POD_TEST_CONTAINER_STATUS" ]; then
+                echo "错误：Pod Test Pod ($POD_TEST_POD) 处于 CrashLoopBackOff 状态，输出日志："
+                k8s kubectl logs -n $NAMESPACE $POD_TEST_POD --tail=50
+                k8s kubectl describe pod -n $NAMESPACE $POD_TEST_POD
+                exit 1
+            fi
+            echo "Pod Test Pod ($POD_TEST_POD) 状态: $POD_TEST_STATUS, Ready: $POD_TEST_READY，等待中..."
+        fi
+    else
+        echo "未找到 Pod Test Pod，等待中..."
+        k8s kubectl get pods -n $NAMESPACE -l app=pod-test
+    fi
+    sleep 5
+    POD_TEST_TIMEOUT_COUNT=$((POD_TEST_TIMEOUT_COUNT + 5))
+    if [ $POD_TEST_TIMEOUT_COUNT -ge $TIMEOUT ]; then
+        echo "错误：等待 Pod Test Pod 超时（${TIMEOUT}秒），请检查部署状态："
+        k8s kubectl get pods -n $NAMESPACE
+        k8s kubectl describe deployment -n $NAMESPACE pod-test
+        exit 1
+    fi
+done
+
 # 启动 Hook 容器内的命令并检查端口
 echo "启动 Hook 容器内的命令..."
 k8s kubectl exec -n $NAMESPACE $HOOK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/hook --config-path=/etc/config/config.yaml --hmac-secret-file=/etc/hmac/hmac --github-app-id=1263514 --github-app-private-key-path=/etc/github/github-token --plugin-config=/etc/plugins/plugins.yaml --job-config-path=/etc/job-config/prow-jobs.yaml --dry-run=false > /tmp/hook.log 2>&1 &)"
@@ -403,6 +634,32 @@ done
 # 启动 Prow Controller Manager 容器内的命令
 echo "启动 Prow Controller Manager 容器内的命令..."
 k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml --kubeconfig=/etc/kubeconfig/config > /tmp/controller.log 2>&1 &)"
+
+# 复制 pod-test 二进制文件到 Pod Test 容器并执行
+echo "复制 pod-test 二进制文件到 Pod Test 容器..."
+k8s kubectl cp /tmp/pod-test/pod-test $NAMESPACE/$POD_TEST_POD:/tmp/pod-test
+
+# 验证 Pod Test 的测试结果
+echo "验证 Pod Test 的测试结果..."
+POD_TEST_LOG_TIMEOUT=0
+while true; do
+    POD_TEST_LOG_CHECK=$(k8s kubectl exec -n $NAMESPACE $POD_TEST_POD -- /bin/sh -c "[ -f /tmp/pod-test.log ] && echo 'exists'" || echo "not_exists")
+    if [ "$POD_TEST_LOG_CHECK" = "exists" ]; then
+        echo "Pod Test 已生成测试日志，输出测试结果："
+        k8s kubectl exec -n $NAMESPACE $POD_TEST_POD -- /bin/sh -c "cat /tmp/pod-test.log"
+        break
+    else
+        echo "Pod Test 尚未生成测试日志，等待中..."
+        sleep 5
+        POD_TEST_LOG_TIMEOUT=$((POD_TEST_LOG_TIMEOUT + 5))
+        if [ $POD_TEST_LOG_TIMEOUT -ge $TIMEOUT ]; then
+            echo "错误：等待 Pod Test 日志超时（${TIMEOUT}秒），请检查容器状态："
+            k8s kubectl logs -n $NAMESPACE $POD_TEST_POD --tail=50
+            k8s kubectl describe pod -n $NAMESPACE $POD_TEST_POD
+            exit 1
+        fi
+    fi
+done
 
 # 验证部署结果
 echo "验证部署结果..."

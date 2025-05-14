@@ -197,3 +197,64 @@ spec:
           secret:
             secretName: kubeconfig
             defaultMode: 420
+
+---
+# Pod Test Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-test
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      containers:
+        - name: pod-test
+          image: golang:1.21
+          command:
+            - /bin/sh
+            - -c
+            - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && /tmp/pod-test > /tmp/pod-test.log 2>&1 && echo 'Pod test completed, logs at /tmp/pod-test.log' && sleep infinity"
+          env:
+            - name: LOGRUS_LEVEL
+              value: "debug"
+            - name: HTTP_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: HTTPS_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
+            - name: KUBECONFIG
+              value: "/etc/kubeconfig/config"
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: /etc/kubeconfig
+              readOnly: true
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: kubeconfig
+            defaultMode: 420
+
+---
+# Pod Test Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-test
+  namespace: default
+spec:
+  selector:
+    app: pod-test
+  ports:
+    - port: 8081
+      targetPort: 8081
+      nodePort: 30003
+  type: NodePort
