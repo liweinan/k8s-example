@@ -215,6 +215,8 @@ spec:
       labels:
         app: pod-test
     spec:
+      serviceAccountName: plank
+      automountServiceAccountToken: true
       containers:
         - name: pod-test
           image: golang:1.22-bookworm
