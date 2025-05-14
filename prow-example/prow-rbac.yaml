@@ -14,6 +14,14 @@ metadata:
   namespace: prow
 
 ---
+# ServiceAccount for Plank
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: plank
+  namespace: prow
+
+---
 # Secret for Deck ServiceAccount token
 apiVersion: v1
 kind: Secret
@@ -25,28 +33,39 @@ metadata:
 type: kubernetes.io/service-account-token
 
 ---
-# Role to grant permissions to access ProwJob resources in the prow namespace
+# Secret for Plank ServiceAccount token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: plank-token
+  namespace: prow
+  annotations:
+    kubernetes.io/service-account.name: plank
+type: kubernetes.io/service-account-token
+
+---
+# Role to grant permissions to access ProwJob resources in the prow namespace (for Deck)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: prow-deck
   namespace: prow
 rules:
-- apiGroups: ["prow.k8s.io"]
-  resources: ["prowjobs"]
-  verbs: ["get", "list", "watch"]
+  - apiGroups: ["prow.k8s.io"]
+    resources: ["prowjobs"]
+    verbs: ["get", "list", "watch"]
 
 ---
-# Role to grant permissions to access ProwJob resources in the default namespace
+# Role to grant permissions to access ProwJob resources in the default namespace (for Deck)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: prow-deck-default
   namespace: default
 rules:
-- apiGroups: ["prow.k8s.io"]
-  resources: ["prowjobs"]
-  verbs: ["get", "list", "watch"]
+  - apiGroups: ["prow.k8s.io"]
+    resources: ["prowjobs"]
+    verbs: ["get", "list", "watch"]
 
 ---
 # Role for Hook to manage ProwJobs in prow namespace
@@ -56,9 +75,9 @@ metadata:
   name: prow-hook
   namespace: prow
 rules:
-- apiGroups: ["prow.k8s.io"]
-  resources: ["prowjobs"]
-  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["prow.k8s.io"]
+    resources: ["prowjobs"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
 
 ---
 # Role for Hook to manage ProwJobs in default namespace
@@ -68,9 +87,24 @@ metadata:
   name: prow-hook-default
   namespace: default
 rules:
-- apiGroups: ["prow.k8s.io"]
-  resources: ["prowjobs"]
-  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["prow.k8s.io"]
+    resources: ["prowjobs"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+---
+# Role for Plank to manage ProwJobs and Pods in the prow namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prow-plank
+  namespace: prow
+rules:
+  - apiGroups: ["prow.k8s.io"]
+    resources: ["prowjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
 ---
 # RoleBinding to bind the Role to the deck ServiceAccount in the prow namespace (for prow namespace)
@@ -80,9 +114,9 @@ metadata:
   name: prow-deck
   namespace: prow
 subjects:
-- kind: ServiceAccount
-  name: deck
-  namespace: prow
+  - kind: ServiceAccount
+    name: deck
+    namespace: prow
 roleRef:
   kind: Role
   name: prow-deck
@@ -96,9 +130,9 @@ metadata:
   name: prow-deck-default
   namespace: default
 subjects:
-- kind: ServiceAccount
-  name: deck
-  namespace: prow
+  - kind: ServiceAccount
+    name: deck
+    namespace: prow
 roleRef:
   kind: Role
   name: prow-deck-default
@@ -112,9 +146,9 @@ metadata:
   name: prow-hook
   namespace: prow
 subjects:
-- kind: ServiceAccount
-  name: hook
-  namespace: prow
+  - kind: ServiceAccount
+    name: hook
+    namespace: prow
 roleRef:
   kind: Role
   name: prow-hook
@@ -128,10 +162,26 @@ metadata:
   name: prow-hook-default
   namespace: default
 subjects:
-- kind: ServiceAccount
-  name: hook
-  namespace: prow
+  - kind: ServiceAccount
+    name: hook
+    namespace: prow
 roleRef:
   kind: Role
   name: prow-hook-default
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding to bind the Role to the plank ServiceAccount in the prow namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prow-plank
+  namespace: prow
+subjects:
+  - kind: ServiceAccount
+    name: plank
+    namespace: prow
+roleRef:
+  kind: Role
+  name: prow-plank
   apiGroup: rbac.authorization.k8s.io
