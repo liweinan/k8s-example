@@ -384,7 +384,7 @@ fi
 
 # 拉取 golang:1.21 镜像（用于 pod-test container）
 echo "拉取 golang:1.21 镜像..."
-if ! ctr image pull golang:1.21; then
+if ! ctr image pull docker.io/library/golang:1.21; then
     echo "错误：无法拉取 golang:1.21 镜像，请检查网络、代理设置或镜像是否存在。"
     exit 1
 fi
