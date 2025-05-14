@@ -170,14 +170,14 @@ spec:
           command:
             - /bin/sh
             - -c
-            - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
+            - "sleep infinity"
           env:
             - name: LOGRUS_LEVEL
               value: "debug"
             - name: HTTP_PROXY
-              value: "http://${PROXY_IP}:${PROXY_PORT}"
+              value: "http://192.168.0.123:1080"
             - name: HTTPS_PROXY
-              value: "http://${PROXY_IP}:${PROXY_PORT}"
+              value: "http://192.168.0.123:1080"
             - name: NO_PROXY
               value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
             - name: KUBECONFIG
