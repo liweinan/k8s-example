@@ -381,7 +381,7 @@ done
 
 # 启动 Prow Controller Manager 容器内的命令
 echo "启动 Prow Controller Manager 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml > /tmp/controller.log 2>&1 &)"
+k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml --namespace=$NAMESPACE > /tmp/controller.log 2>&1 &)"
 
 # 验证部署结果
 echo "验证部署结果..."

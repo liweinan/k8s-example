@@ -14,7 +14,7 @@ metadata:
   namespace: prow
 
 ---
-# ServiceAccount for Plank
+# ServiceAccount for Plank (used by prow-controller-manager)
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -107,6 +107,18 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
 ---
+# Role for Plank to manage ProwJobs in the default namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prow-plank-default
+  namespace: default
+rules:
+  - apiGroups: ["prow.k8s.io"]
+    resources: ["prowjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
 # RoleBinding to bind the Role to the deck ServiceAccount in the prow namespace (for prow namespace)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -184,4 +196,20 @@ subjects:
 roleRef:
   kind: Role
   name: prow-plank
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding to bind the Role to the plank ServiceAccount in the default namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prow-plank-default
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: plank
+    namespace: prow
+roleRef:
+  kind: Role
+  name: prow-plank-default
   apiGroup: rbac.authorization.k8s.io
