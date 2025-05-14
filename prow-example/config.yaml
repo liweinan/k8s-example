@@ -1,5 +1,5 @@
+log_level: "debug"
 prow:
-  log_level: "debug"
   prowjob_namespace: "default"
   pod_namespace: "default"
   plank:
