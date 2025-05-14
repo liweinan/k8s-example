@@ -168,13 +168,6 @@ EOF
 k8s kubectl create secret generic kubeconfig -n $NAMESPACE --from-file=config=/tmp/kubeconfig.yaml
 rm /tmp/kubeconfig.yaml
 
-# 创建 test-project ConfigMap
-echo "创建 test-project ConfigMap..."
-k8s kubectl create configmap test-project -n $NAMESPACE \
-  --from-file=go.mod=./test-project/go.mod \
-  --from-file=math.go=./test-project/math.go \
-  --from-file=math_test.go=./test-project/math_test.go
-
 k8s kubectl create secret -n $NAMESPACE generic hmac-token --from-file=hmac=./secret
 k8s kubectl create secret -n $NAMESPACE generic github-token --from-file=github-token=./alchemy-prow-bot.2025-05-11.private-key.pem
 k8s kubectl create configmap -n $NAMESPACE config --from-file=config.yaml=./config.yaml
@@ -183,7 +176,7 @@ k8s kubectl create configmap -n $NAMESPACE job-config --from-file=prow-jobs.yaml
 
 # 验证 ConfigMap 是否创建成功
 echo "验证 ConfigMap 是否创建..."
-for CONFIGMAP in config plugins job-config test-project; do
+for CONFIGMAP in config plugins job-config; do
     if ! k8s kubectl get configmap -n $NAMESPACE $CONFIGMAP --no-headers >/dev/null 2>&1; then
         echo "错误：ConfigMap $CONFIGMAP 未创建，请检查文件是否存在或集群状态。"
         k8s kubectl describe configmap -n $NAMESPACE $CONFIGMAP || echo "ConfigMap 不存在。"
@@ -363,7 +356,6 @@ func main() {
 EOF
 export HTTP_PROXY=$PROXY
 export HTTPS_PROXY=$PROXY
-
 cd /tmp/pod-test
 go mod tidy
 go build -o pod-test pod-test.go
@@ -375,6 +367,8 @@ fi
 
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
+export HTTP_PROXY=$PROXY
+export HTTPS_PROXY=$PROXY
 
 # 拉取镜像
 echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:latest..."
