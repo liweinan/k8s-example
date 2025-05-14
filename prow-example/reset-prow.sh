@@ -389,6 +389,21 @@ if ! ctr image pull docker.io/library/golang:1.21; then
     exit 1
 fi
 
+# 验证镜像是否成功拉取
+echo "验证 golang:1.21 镜像是否成功拉取..."
+if ! ctr image ls | grep -q docker.io/library/golang:1.21; then
+    echo "错误：golang:1.21 镜像未找到，尝试重新拉取..."
+    ctr image rm docker.io/library/golang:1.21 2>/dev/null || true
+    if ! ctr image pull --all-platforms docker.io/library/golang:1.21; then
+        echo "错误：重新拉取 golang:1.21 镜像失败，请检查网络、代理设置或镜像是否存在。"
+        exit 1
+    fi
+    if ! ctr image ls | grep -q docker.io/library/golang:1.21; then
+        echo "错误：golang:1.21 镜像仍未找到，请检查 containerd 状态。"
+        exit 1
+    fi
+fi
+
 # 导出镜像
 ctr image export hook.tar gcr.io/k8s-prow/hook:latest
 ctr image export deck.tar gcr.io/k8s-prow/deck:latest
