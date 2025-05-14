@@ -18,7 +18,7 @@ PROXY_PORT=1080
 PROXY="http://${PROXY_IP}:${PROXY_PORT}"
 
 # 定义 NO_PROXY 设置，排除 Kubernetes API 服务器和服务 CIDR
-NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
 
 # 定义等待超时时间（秒）
 TIMEOUT=600  # 10 minutes to give Deck more time to start
@@ -136,6 +136,32 @@ k8s kubectl get crd prowjobs.prow.k8s.io
 
 # 重新创建必要的 Secret 和 ConfigMap
 echo "重新创建必要的 Secret 和 ConfigMap..."
+
+# 创建 kubeconfig Secret
+echo "创建 kubeconfig Secret..."
+cat <<EOF > /tmp/kubeconfig.yaml
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    server: https://10.152.183.1:443
+  name: default
+contexts:
+- context:
+    cluster: default
+    namespace: default
+    user: plank
+  name: default-context
+current-context: default-context
+users:
+- name: plank
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+EOF
+
+k8s kubectl create secret generic kubeconfig -n $NAMESPACE --from-file=config=/tmp/kubeconfig.yaml
+rm /tmp/kubeconfig.yaml
 
 k8s kubectl create secret -n $NAMESPACE generic hmac-token --from-file=hmac=./secret
 k8s kubectl create secret -n $NAMESPACE generic github-token --from-file=github-token=./alchemy-prow-bot.2025-05-11.private-key.pem
@@ -376,7 +402,7 @@ done
 
 # 启动 Prow Controller Manager 容器内的命令
 echo "启动 Prow Controller Manager 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml > /tmp/controller.log 2>&1 &)"
+k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml --kubeconfig=/etc/kubeconfig/config > /tmp/controller.log 2>&1 &)"
 
 # 验证部署结果
 echo "验证部署结果..."

@@ -31,7 +31,7 @@ spec:
             - name: HTTPS_PROXY
               value: "http://${PROXY_IP}:${PROXY_PORT}"
             - name: NO_PROXY
-              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
           ports:
             - containerPort: 8888
           volumeMounts:
@@ -112,6 +112,12 @@ spec:
           env:
             - name: LOGRUS_LEVEL
               value: "debug"
+            - name: HTTP_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: HTTPS_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
           ports:
             - containerPort: 8080
           volumeMounts:
@@ -168,11 +174,26 @@ spec:
           env:
             - name: LOGRUS_LEVEL
               value: "debug"
+            - name: HTTP_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: HTTPS_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
+            - name: KUBECONFIG
+              value: "/etc/kubeconfig/config"
           volumeMounts:
             - name: config
               mountPath: /etc/config
+              readOnly: true
+            - name: kubeconfig
+              mountPath: /etc/kubeconfig
               readOnly: true
       volumes:
         - name: config
           configMap:
             name: config
+        - name: kubeconfig
+          secret:
+            secretName: kubeconfig
+            defaultMode: 420
