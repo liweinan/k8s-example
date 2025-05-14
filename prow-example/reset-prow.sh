@@ -23,10 +23,10 @@ NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183
 # 定义等待超时时间（秒）
 TIMEOUT=600  # 10 minutes to give Deck more time to start
 
-# 清理 pod-test.tar 和 golang:1.21 镜像
-echo "清理 pod-test.tar 和 golang:1.21 镜像..."
+# 清理 pod-test.tar 和 go-runner 镜像
+echo "清理 pod-test.tar 和 go-runner 镜像..."
 rm pod-test.tar 2>/dev/null || true
-sudo ctr image rm docker.io/library/golang:1.21 2>/dev/null || true
+ctr image rm gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0 2>/dev/null || true
 
 # 打印开始信息
 echo "开始清理 Prow 服务..."
@@ -191,7 +191,7 @@ mkdir -p /tmp/pod-test
 cat <<EOF > /tmp/pod-test/go.mod
 module pod-test
 
-go 1.21
+go 1.22
 
 require (
 	k8s.io/api v0.29.2
@@ -354,8 +354,6 @@ func main() {
 	}
 }
 EOF
-export HTTP_PROXY=$PROXY
-export HTTPS_PROXY=$PROXY
 cd /tmp/pod-test
 go mod tidy
 go build -o pod-test pod-test.go
@@ -367,8 +365,6 @@ fi
 
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
-export HTTP_PROXY=$PROXY
-export HTTPS_PROXY=$PROXY
 
 # 拉取镜像
 echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:latest..."
@@ -389,24 +385,24 @@ if ! ctr image pull gcr.io/k8s-prow/prow-controller-manager:latest; then
     exit 1
 fi
 
-# 拉取 golang:1.21 镜像（用于 pod-test container）
-echo "拉取 golang:1.21 镜像..."
-if ! ctr image pull --platform linux/amd64 docker.io/library/golang:1.21; then
-    echo "错误：无法拉取 golang:1.21 镜像，请检查网络、代理设置或镜像是否存在。"
+# 拉取 go-runner 镜像（用于 pod-test container）
+echo "拉取 go-runner 镜像..."
+if ! ctr image pull --platform linux/amd64 gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+    echo "错误：无法拉取 go-runner 镜像，请检查网络、代理设置或镜像是否存在。"
     exit 1
 fi
 
 # 验证镜像是否成功拉取
-echo "验证 golang:1.21 镜像是否成功拉取..."
-if ! ctr image ls | grep -q docker.io/library/golang:1.21; then
-    echo "错误：golang:1.21 镜像未找到，尝试重新拉取..."
-    ctr image rm docker.io/library/golang:1.21 2>/dev/null || true
-    if ! ctr image pull --platform linux/amd64 docker.io/library/golang:1.21; then
-        echo "错误：重新拉取 golang:1.21 镜像失败，请检查网络、代理设置或镜像是否存在。"
+echo "验证 go-runner 镜像是否成功拉取..."
+if ! ctr image ls | grep -q gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+    echo "错误：go-runner 镜像未找到，尝试重新拉取..."
+    ctr image rm gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0 2>/dev/null || true
+    if ! ctr image pull --platform linux/amd64 gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+        echo "错误：重新拉取 go-runner 镜像失败，请检查网络、代理设置或镜像是否存在。"
         exit 1
     fi
-    if ! ctr image ls | grep -q docker.io/library/golang:1.21; then
-        echo "错误：golang:1.21 镜像仍未找到，请检查 containerd 状态。"
+    if ! ctr image ls | grep -q gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+        echo "错误：go-runner 镜像仍未找到，请检查 containerd 状态。"
         exit 1
     fi
 fi
@@ -415,7 +411,7 @@ fi
 ctr image export hook.tar gcr.io/k8s-prow/hook:latest
 ctr image export deck.tar gcr.io/k8s-prow/deck:latest
 ctr image export controller.tar gcr.io/k8s-prow/prow-controller-manager:latest
-ctr image export pod-test.tar docker.io/library/golang:1.21
+ctr image export pod-test.tar gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0
 ctr -n k8s.io image import hook.tar
 ctr -n k8s.io image import deck.tar
 ctr -n k8s.io image import controller.tar
@@ -423,7 +419,7 @@ ctr -n k8s.io image import pod-test.tar
 rm hook.tar deck.tar controller.tar pod-test.tar
 
 echo "验证镜像是否导入到 k8s.io 命名空间..."
-ctr -n k8s.io image ls | grep -E 'gcr.io/k8s-prow|docker.io/library/golang' || echo "镜像未找到，请检查 ctr 命令是否成功执行"
+ctr -n k8s.io image ls | grep -E 'gcr.io/k8s-prow|gcr.io/k8s-staging-build-image/go-runner' || echo "镜像未找到，请检查 ctr 命令是否成功执行"
 
 # 重新应用 prow-setup.yaml
 echo "重新应用 prow-setup.yaml..."
