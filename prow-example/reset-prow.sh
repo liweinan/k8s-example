@@ -23,6 +23,11 @@ NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183
 # 定义等待超时时间（秒）
 TIMEOUT=600  # 10 minutes to give Deck more time to start
 
+# 清理 pod-test.tar 和 golang:1.21 镜像
+echo "清理 pod-test.tar 和 golang:1.21 镜像..."
+rm pod-test.tar 2>/dev/null || true
+sudo ctr image rm docker.io/library/golang:1.21 2>/dev/null || true
+
 # 打印开始信息
 echo "开始清理 Prow 服务..."
 
@@ -163,6 +168,13 @@ EOF
 k8s kubectl create secret generic kubeconfig -n $NAMESPACE --from-file=config=/tmp/kubeconfig.yaml
 rm /tmp/kubeconfig.yaml
 
+# 创建 test-project ConfigMap
+echo "创建 test-project ConfigMap..."
+k8s kubectl create configmap test-project -n $NAMESPACE \
+  --from-file=go.mod=./test-project/go.mod \
+  --from-file=math.go=./test-project/math.go \
+  --from-file=math_test.go=./test-project/math_test.go
+
 k8s kubectl create secret -n $NAMESPACE generic hmac-token --from-file=hmac=./secret
 k8s kubectl create secret -n $NAMESPACE generic github-token --from-file=github-token=./alchemy-prow-bot.2025-05-11.private-key.pem
 k8s kubectl create configmap -n $NAMESPACE config --from-file=config.yaml=./config.yaml
@@ -171,7 +183,7 @@ k8s kubectl create configmap -n $NAMESPACE job-config --from-file=prow-jobs.yaml
 
 # 验证 ConfigMap 是否创建成功
 echo "验证 ConfigMap 是否创建..."
-for CONFIGMAP in config plugins job-config; do
+for CONFIGMAP in config plugins job-config test-project; do
     if ! k8s kubectl get configmap -n $NAMESPACE $CONFIGMAP --no-headers >/dev/null 2>&1; then
         echo "错误：ConfigMap $CONFIGMAP 未创建，请检查文件是否存在或集群状态。"
         k8s kubectl describe configmap -n $NAMESPACE $CONFIGMAP || echo "ConfigMap 不存在。"
@@ -349,6 +361,9 @@ func main() {
 	}
 }
 EOF
+export HTTP_PROXY=$PROXY
+export HTTPS_PROXY=$PROXY
+
 cd /tmp/pod-test
 go mod tidy
 go build -o pod-test pod-test.go
@@ -360,8 +375,6 @@ fi
 
 # 导入镜像到 k8s.io 命名空间
 echo "导入镜像到 k8s.io 命名空间..."
-export HTTP_PROXY=$PROXY
-export HTTPS_PROXY=$PROXY
 
 # 拉取镜像
 echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:latest..."
@@ -394,7 +407,7 @@ echo "验证 golang:1.21 镜像是否成功拉取..."
 if ! ctr image ls | grep -q docker.io/library/golang:1.21; then
     echo "错误：golang:1.21 镜像未找到，尝试重新拉取..."
     ctr image rm docker.io/library/golang:1.21 2>/dev/null || true
-    if ! ctr image pull --all-platforms docker.io/library/golang:1.21; then
+    if ! ctr image pull --platform linux/amd64 docker.io/library/golang:1.21; then
         echo "错误：重新拉取 golang:1.21 镜像失败，请检查网络、代理设置或镜像是否存在。"
         exit 1
     fi
