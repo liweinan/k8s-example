@@ -62,7 +62,7 @@ if ! k8s kubectl get serviceaccount -n $NAMESPACE hook --no-headers >/dev/null 2
     exit 1
 fi
 
-# 验证 plank ServiceAccount 和 token Secret
+# 验证 plank ServiceAccount 和 token Secret (used by prow-controller-manager)
 echo "验证 plank ServiceAccount 是否创建..."
 if ! k8s kubectl get serviceaccount -n $NAMESPACE plank --no-headers >/dev/null 2>&1; then
     echo "错误：plank ServiceAccount 未创建，请检查 prow-rbac.yaml 或集群状态。"
@@ -164,32 +164,32 @@ export HTTP_PROXY=$PROXY
 export HTTPS_PROXY=$PROXY
 
 # 拉取镜像
-echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:ko-v20240805-37a08f946..."
-if ! ctr image pull gcr.io/k8s-prow/hook:ko-v20240805-37a08f946; then
-    echo "错误：无法拉取 Hook 镜像 gcr.io/k8s-prow/hook:ko-v20240805-37a08f946，请检查网络、代理设置或镜像是否存在。"
+echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:latest..."
+if ! ctr image pull gcr.io/k8s-prow/hook:latest; then
+    echo "错误：无法拉取 Hook 镜像 gcr.io/k8s-prow/hook:latest，请检查网络、代理设置或镜像是否存在。"
     exit 1
 fi
 
-echo "拉取 Deck 镜像 gcr.io/k8s-prow/deck:ko-v20240805-37a08f946..."
-if ! ctr image pull gcr.io/k8s-prow/deck:ko-v20240805-37a08f946; then
-    echo "错误：无法拉取 Deck 镜像 gcr.io/k8s-prow/deck:ko-v20240805-37a08f946，请检查网络、代理设置或镜像是否存在。"
+echo "拉取 Deck 镜像 gcr.io/k8s-prow/deck:latest..."
+if ! ctr image pull gcr.io/k8s-prow/deck:latest; then
+    echo "错误：无法拉取 Deck 镜像 gcr.io/k8s-prow/deck:latest，请检查网络、代理设置或镜像是否存在。"
     exit 1
 fi
 
-echo "拉取 Plank 镜像 gcr.io/k8s-prow/plank:ko-v20240805-37a08f946..."
-if ! ctr image pull gcr.io/k8s-prow/plank:ko-v20240805-37a08f946; then
-    echo "错误：无法拉取 Plank 镜像 gcr.io/k8s-prow/plank:ko-v20240805-37a08f946，请检查网络、代理设置或镜像是否存在。"
+echo "拉取 Prow Controller Manager 镜像 gcr.io/k8s-prow/prow-controller-manager:latest..."
+if ! ctr image pull gcr.io/k8s-prow/prow-controller-manager:latest; then
+    echo "错误：无法拉取 Prow Controller Manager 镜像 gcr.io/k8s-prow/prow-controller-manager:latest，请检查网络、代理设置或镜像是否存在。"
     exit 1
 fi
 
 # 导出镜像
-ctr image export hook.tar gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
-ctr image export deck.tar gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
-ctr image export plank.tar gcr.io/k8s-prow/plank:ko-v20240805-37a08f946
+ctr image export hook.tar gcr.io/k8s-prow/hook:latest
+ctr image export deck.tar gcr.io/k8s-prow/deck:latest
+ctr image export controller.tar gcr.io/k8s-prow/prow-controller-manager:latest
 ctr -n k8s.io image import hook.tar
 ctr -n k8s.io image import deck.tar
-ctr -n k8s.io image import plank.tar
-rm hook.tar deck.tar plank.tar
+ctr -n k8s.io image import controller.tar
+rm hook.tar deck.tar controller.tar
 
 echo "验证镜像是否导入到 k8s.io 命名空间..."
 ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检查 ctr 命令是否成功执行"
@@ -198,7 +198,7 @@ ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检�
 echo "重新应用 prow-setup.yaml..."
 k8s kubectl apply -f $PROW_SETUP_FILE
 
-# 验证 Hook, Deck, 和 Plank Deployment 是否创建成功
+# 验证 Hook, Deck, 和 Prow Controller Manager Deployment 是否创建成功
 echo "验证 Hook Deployment 是否创建..."
 if ! k8s kubectl get deployment -n $NAMESPACE hook --no-headers >/dev/null 2>&1; then
     echo "错误：Hook Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
@@ -213,15 +213,15 @@ if ! k8s kubectl get deployment -n $NAMESPACE deck --no-headers >/dev/null 2>&1;
     exit 1
 fi
 
-echo "验证 Plank Deployment 是否创建..."
-if ! k8s kubectl get deployment -n $NAMESPACE plank --no-headers >/dev/null 2>&1; then
-    echo "错误：Plank Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
-    k8s kubectl describe deployment -n $NAMESPACE plank || echo "Deployment 不存在。"
+echo "验证 Prow Controller Manager Deployment 是否创建..."
+if ! k8s kubectl get deployment -n $NAMESPACE prow-controller-manager --no-headers >/dev/null 2>&1; then
+    echo "错误：Prow Controller Manager Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
+    k8s kubectl describe deployment -n $NAMESPACE prow-controller-manager || echo "Deployment 不存在。"
     exit 1
 fi
 
 # 等待 Pod 进入 Running 状态
-echo "等待 Hook、Deck 和 Plank Pod 进入 Running 状态..."
+echo "等待 Hook、Deck 和 Prow Controller Manager Pod 进入 Running 状态..."
 
 # 等待 Hook Pod
 echo "等待 Hook Pod..."
@@ -295,38 +295,38 @@ while true; do
     fi
 done
 
-# 等待 Plank Pod
-echo "等待 Plank Pod..."
-PLANK_TIMEOUT_COUNT=0
+# 等待 Prow Controller Manager Pod
+echo "等待 Prow Controller Manager Pod..."
+CONTROLLER_TIMEOUT_COUNT=0
 while true; do
-    PLANK_POD=$(k8s kubectl get pods -n $NAMESPACE -l app=plank --no-headers -o custom-columns=":metadata.name" | head -n 1)
-    if [ -n "$PLANK_POD" ]; then
-        PLANK_STATUS=$(k8s kubectl get pod -n $NAMESPACE $PLANK_POD --no-headers -o custom-columns=":status.phase")
-        PLANK_READY=$(k8s kubectl get pod -n $NAMESPACE $PLANK_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
-        PLANK_CONDITION=$(k8s kubectl get pod -n $NAMESPACE $PLANK_POD --no-headers -o custom-columns=":status.conditions[?(@.type=='Ready')].status" | grep "False" || true)
-        if [ "$PLANK_STATUS" = "Running" ] && [ -n "$PLANK_READY" ] && [ -z "$PLANK_CONDITION" ]; then
-            echo "Plank Pod ($PLANK_POD) 已进入 Running 状态且 Ready"
+    CONTROLLER_POD=$(k8s kubectl get pods -n $NAMESPACE -l app=prow-controller-manager --no-headers -o custom-columns=":metadata.name" | head -n 1)
+    if [ -n "$CONTROLLER_POD" ]; then
+        CONTROLLER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.phase")
+        CONTROLLER_READY=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
+        CONTROLLER_CONDITION=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.conditions[?(@.type=='Ready')].status" | grep "False" || true)
+        if [ "$CONTROLLER_STATUS" = "Running" ] && [ -n "$CONTROLLER_READY" ] && [ -z "$CONTROLLER_CONDITION" ]; then
+            echo "Prow Controller Manager Pod ($CONTROLLER_POD) 已进入 Running 状态且 Ready"
             break
         else
-            PLANK_CONTAINER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $PLANK_POD --no-headers -o custom-columns=":status.containerStatuses[0].state" | grep "CrashLoopBackOff" || true)
-            if [ -n "$PLANK_CONTAINER_STATUS" ]; then
-                echo "错误：Plank Pod ($PLANK_POD) 处于 CrashLoopBackOff 状态，输出日志："
-                k8s kubectl logs -n $NAMESPACE $PLANK_POD --tail=50
-                k8s kubectl describe pod -n $NAMESPACE $PLANK_POD
+            CONTROLLER_CONTAINER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.containerStatuses[0].state" | grep "CrashLoopBackOff" || true)
+            if [ -n "$CONTROLLER_CONTAINER_STATUS" ]; then
+                echo "错误：Prow Controller Manager Pod ($CONTROLLER_POD) 处于 CrashLoopBackOff 状态，输出日志："
+                k8s kubectl logs -n $NAMESPACE $CONTROLLER_POD --tail=50
+                k8s kubectl describe pod -n $NAMESPACE $CONTROLLER_POD
                 exit 1
             fi
-            echo "Plank Pod ($PLANK_POD) 状态: $PLANK_STATUS, Ready: $PLANK_READY，等待中..."
+            echo "Prow Controller Manager Pod ($CONTROLLER_POD) 状态: $CONTROLLER_STATUS, Ready: $CONTROLLER_READY，等待中..."
         fi
     else
-        echo "未找到 Plank Pod，等待中..."
-        k8s kubectl get pods -n $NAMESPACE -l app=plank
+        echo "未找到 Prow Controller Manager Pod，等待中..."
+        k8s kubectl get pods -n $NAMESPACE -l app=prow-controller-manager
     fi
     sleep 5
-    PLANK_TIMEOUT_COUNT=$((PLANK_TIMEOUT_COUNT + 5))
-    if [ $PLANK_TIMEOUT_COUNT -ge $TIMEOUT ]; then
-        echo "错误：等待 Plank Pod 超时（${TIMEOUT}秒），请检查部署状态："
+    CONTROLLER_TIMEOUT_COUNT=$((CONTROLLER_TIMEOUT_COUNT + 5))
+    if [ $CONTROLLER_TIMEOUT_COUNT -ge $TIMEOUT ]; then
+        echo "错误：等待 Prow Controller Manager Pod 超时（${TIMEOUT}秒），请检查部署状态："
         k8s kubectl get pods -n $NAMESPACE
-        k8s kubectl describe deployment -n $NAMESPACE plank
+        k8s kubectl describe deployment -n $NAMESPACE prow-controller-manager
         exit 1
     fi
 done
@@ -379,9 +379,9 @@ while true; do
     fi
 done
 
-# 启动 Plank 容器内的命令
-echo "启动 Plank 容器内的命令..."
-k8s kubectl exec -n $NAMESPACE $PLANK_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/plank --config-path=/etc/config/config.yaml > /tmp/plank.log 2>&1 &)"
+# 启动 Prow Controller Manager 容器内的命令
+echo "启动 Prow Controller Manager 容器内的命令..."
+k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml > /tmp/controller.log 2>&1 &)"
 
 # 验证部署结果
 echo "验证部署结果..."

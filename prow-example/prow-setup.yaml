@@ -18,7 +18,7 @@ spec:
       automountServiceAccountToken: true
       containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
+          image: gcr.io/k8s-prow/hook:latest
           command:
             - /bin/sh
             - -c
@@ -104,7 +104,7 @@ spec:
       automountServiceAccountToken: true
       containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
+          image: gcr.io/k8s-prow/deck:latest
           command:
             - /bin/sh
             - -c
@@ -140,27 +140,27 @@ spec:
   type: NodePort
 
 ---
-# Plank Deployment
+# Prow Controller Manager Deployment (replacing Plank)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: plank
+  name: prow-controller-manager
   namespace: prow
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: plank
+      app: prow-controller-manager
   template:
     metadata:
       labels:
-        app: plank
+        app: prow-controller-manager
     spec:
       serviceAccountName: plank
       automountServiceAccountToken: true
       containers:
-        - name: plank
-          image: gcr.io/k8s-prow/plank:ko-v20240805-37a08f946
+        - name: prow-controller-manager
+          image: gcr.io/k8s-prow/prow-controller-manager:latest
           command:
             - /bin/sh
             - -c
