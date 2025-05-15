@@ -132,6 +132,37 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 			return false, fmt.Errorf("failed to get pod %s: %w", podName.String(), err)
 		}
 
+		// Log pod status while waiting
+		logWithTime("Pod status: Phase=%s, Message=%s, Reason=%s", pod.Status.Phase, pod.Status.Message, pod.Status.Reason)
+
+		// Check pod conditions
+		for _, condition := range pod.Status.Conditions {
+			logWithTime("Pod condition: Type=%s, Status=%s, Reason=%s, Message=%s",
+				condition.Type, condition.Status, condition.Reason, condition.Message)
+
+			// Check for specific failure conditions
+			if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
+				logWithTime("Pod scheduling failed: %s", condition.Message)
+				return false, fmt.Errorf("pod scheduling failed: %s", condition.Message)
+			}
+		}
+
+		// Check container statuses
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			logWithTime("Container status: Name=%s, State=%+v, Ready=%v",
+				containerStatus.Name, containerStatus.State, containerStatus.Ready)
+
+			// Check for container failures
+			if containerStatus.State.Waiting != nil {
+				logWithTime("Container waiting: Reason=%s, Message=%s",
+					containerStatus.State.Waiting.Reason, containerStatus.State.Waiting.Message)
+			}
+			if containerStatus.State.Terminated != nil {
+				logWithTime("Container terminated: Reason=%s, Message=%s, ExitCode=%d",
+					containerStatus.State.Terminated.Reason, containerStatus.State.Terminated.Message, containerStatus.State.Terminated.ExitCode)
+			}
+		}
+
 		// Check if pod is ready
 		if pod.Status.Phase == corev1.PodRunning {
 			for _, condition := range pod.Status.Conditions {
@@ -140,13 +171,6 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 					return true, nil
 				}
 			}
-		}
-
-		// Log pod status while waiting
-		logWithTime("Pod not ready yet: Phase=%s", pod.Status.Phase)
-		for _, condition := range pod.Status.Conditions {
-			logWithTime("Pod condition: Type=%s, Status=%s, Reason=%s, Message=%s",
-				condition.Type, condition.Status, condition.Reason, condition.Message)
 		}
 
 		return false, nil
