@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prow-controller-manager-config
+  namespace: default
+data:
+  config.yaml: |
+    plank:
+      default_decoration_config:
+        timeout: 7200000000000  # 2 hours
+        grace_period: 15000000000  # 15 seconds
+        utility_images:
+          clonerefs: "gcr.io/k8s-prow/clonerefs:v20240515-0c2c5c0c0c"
+          initupload: "gcr.io/k8s-prow/initupload:v20240515-0c2c5c0c0c"
+          entrypoint: "gcr.io/k8s-prow/entrypoint:v20240515-0c2c5c0c0c"
+          sidecar: "gcr.io/k8s-prow/sidecar:v20240515-0c2c5c0c0c"
+        gcs_configuration:
+          bucket: "prow-artifacts"
+          path_strategy: "explicit"
+        gcs_credentials_secret: "gcs-credentials"
+      pod_pending_timeout: 10000000000  # 10 seconds
+      pod_unscheduled_timeout: 10000000000  # 10 seconds
+    sinker:
+      resync_period: 1m
+      max_prowjob_age: 24h
+      max_pod_age: 24h
+    tide:
+      resync_period: 1m
+      max_goroutines: 20
+      batch_size_limit: 0
+      contexts_options:
+        from-branch-protection: true
+        skip-unknown-contexts: true 
