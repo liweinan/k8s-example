@@ -14,10 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
-func startPod(ctx context.Context, client ctrlruntimeclient.Client, jobName string) (string, string, error) {
+func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string, string, error) {
 	log.Printf("Starting pod creation for job %s", jobName)
 
 	// Generate build ID
@@ -52,9 +53,9 @@ func startPod(ctx context.Context, client ctrlruntimeclient.Client, jobName stri
 	log.Printf("Pod will be created with name: %s in namespace: %s", pod.Name, pod.Namespace)
 	log.Printf("Pod spec: %+v", pod)
 
-	// Create the pod
+	// Create the pod using the manager's client
 	log.Printf("Attempting to create pod...")
-	err := client.Create(ctx, pod)
+	err := mgr.GetClient().Create(ctx, pod)
 	if err != nil {
 		log.Printf("Error creating pod: %v", err)
 		return "", "", fmt.Errorf("create pod %s: %w", podName.String(), err)
@@ -66,7 +67,7 @@ func startPod(ctx context.Context, client ctrlruntimeclient.Client, jobName stri
 	startTime := time.Now()
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		var pod corev1.Pod
-		if err := client.Get(ctx, podName, &pod); err != nil {
+		if err := mgr.GetClient().Get(ctx, podName, &pod); err != nil {
 			if kerrors.IsNotFound(err) {
 				log.Printf("Pod not found in cache yet, retrying...")
 				return false, nil
@@ -118,23 +119,43 @@ func main() {
 		log.Fatalf("Error creating client config: %v", err)
 	}
 
-	// Create controller-runtime client
+	// Create controller-runtime manager
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		log.Fatalf("Error adding scheme: %v", err)
 	}
 
-	ctrlClient, err := ctrlruntimeclient.New(cfg, ctrlruntimeclient.Options{Scheme: scheme})
+	mgr, err := manager.New(cfg, manager.Options{
+		Scheme: scheme,
+		// Match plank's cache settings
+		Cache: manager.CacheOptions{
+			SyncPeriod: 10 * time.Second,
+		},
+	})
 	if err != nil {
-		log.Fatalf("Error creating controller-runtime client: %v", err)
+		log.Fatalf("Error creating manager: %v", err)
 	}
+
+	// Start the manager
+	go func() {
+		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+			log.Fatalf("Error starting manager: %v", err)
+		}
+	}()
+
+	// Wait for cache to sync
+	log.Printf("Waiting for cache to sync...")
+	if !mgr.GetCache().WaitForCacheSync(signals.SetupSignalHandler()) {
+		log.Fatalf("Failed to sync cache")
+	}
+	log.Printf("Cache synced successfully")
 
 	// Create a context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Start the pod
-	buildID, podName, err := startPod(ctx, ctrlClient, "test-job")
+	buildID, podName, err := startPod(ctx, mgr, "test-job")
 	if err != nil {
 		log.Fatalf("Error starting pod: %v", err)
 	}
