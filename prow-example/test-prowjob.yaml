@@ -46,7 +46,6 @@ spec:
     repo: my-prow-test-proj
     repo_link: https://github.com/liweinan/my-prow-test-proj
   pod_spec:
-    serviceAccountName: plank
     containers:
       - name: test
         image: busybox
@@ -63,7 +62,9 @@ spec:
           requests:
             cpu: 100m
             memory: 100Mi
-    restartPolicy: Never
+  decoration_config:
+    default_service_account_name: plank
+    skip_cloning: true
 status:
   state: triggered
   startTime: "2024-05-15T07:10:18Z"
