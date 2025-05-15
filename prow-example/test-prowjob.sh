@@ -5,7 +5,7 @@ JOB_NAME="test-job-$(date +%s)"
 
 # Create the ProwJob
 echo "Creating ProwJob $JOB_NAME..."
-cat test-prowjob.yaml | sed "s/test-job-\$(date +%s)/$JOB_NAME/" | k8s kubectl apply -f -
+sed "s/test-job-\$(date +%s)/$JOB_NAME/" test-prowjob.yaml | k8s kubectl apply -f -
 
 # Wait for the ProwJob to be created
 echo "Waiting for ProwJob to be created..."
