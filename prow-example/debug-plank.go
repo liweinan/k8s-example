@@ -133,6 +133,7 @@ func main() {
 			DefaultNamespaces: map[string]cache.Config{
 				"default": {},
 			},
+			SyncPeriod: 10 * time.Second,
 		},
 		Metrics: server.Options{
 			BindAddress: "0",
