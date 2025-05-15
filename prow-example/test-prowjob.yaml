@@ -1,7 +1,7 @@
 apiVersion: prow.k8s.io/v1
 kind: ProwJob
 metadata:
-  name: test-job-$(date +%s)
+  name: test-job-$(date +%s)   # Replace with a static name if not using shell preprocessing
   namespace: default
   labels:
     created-by-prow: "true"
@@ -62,9 +62,6 @@ spec:
           requests:
             cpu: 100m
             memory: 100Mi
-  decoration_config:
-    default_service_account_name: plank
-    skip_cloning: true
 status:
   state: triggered
   startTime: "2024-05-15T07:10:18Z"
