@@ -53,14 +53,23 @@ spec:
             export HTTPS_PROXY=http://192.168.0.123:1080
             export NO_PROXY=localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1
             export GO111MODULE=on
-            
+
+            echo "Current working directory: $PWD"
+            echo "Listing /go directory contents:"
+            ls -la /go
+
             echo "Cloning repository..."
-            git clone https://github.com/liweinan/my-prow-test-proj.git $GOPATH/src/github.com/liweinan/my-prow-test-proj
-            cd $GOPATH/src/github.com/liweinan/my-prow-test-proj
-            
+            REPO_PATH=$GOPATH/src/github.com/liweinan/my-prow-test-proj
+            mkdir -p $REPO_PATH
+            git clone https://github.com/liweinan/my-prow-test-proj.git $REPO_PATH
+            cd $REPO_PATH
+
+            echo "Repository contents:"
+            ls -la
+
             echo "Running go mod tidy..."
             go mod tidy
-            
+
             echo "Running tests..."
             go test -v ./...
         resources:
