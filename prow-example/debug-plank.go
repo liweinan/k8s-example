@@ -8,6 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,17 +21,23 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
-// durationPtr returns a pointer to the given duration
-func durationPtr(d time.Duration) *time.Duration {
-	return &d
+// logWithTime adds a timestamp to log messages
+func logWithTime(format string, args ...interface{}) {
+	log.Printf(format, args...)
+}
+
+// logTiming logs the time taken for an operation
+func logTiming(operation string, start time.Time) {
+	logWithTime("%s took %v", operation, time.Since(start))
 }
 
 func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string, string, error) {
-	log.Printf("Starting pod creation for job %s", jobName)
+	startTime := time.Now()
+	logWithTime("Starting pod creation for job %s", jobName)
 
 	// Generate build ID
 	buildID := fmt.Sprintf("build-%d", time.Now().Unix())
-	log.Printf("Generated build ID: %s", buildID)
+	logWithTime("Generated build ID: %s", buildID)
 
 	// Create pod spec
 	pod := &corev1.Pod{
@@ -51,45 +58,59 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 						"sleep",
 						"3600",
 					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("200m"),
+							corev1.ResourceMemory: resource.MustParse("200Mi"),
+						},
+					},
 				},
 			},
+			RestartPolicy: corev1.RestartPolicyNever,
 		},
 	}
 
 	podName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-	log.Printf("Pod will be created with name: %s in namespace: %s", pod.Name, pod.Namespace)
-	log.Printf("Pod spec: %+v", pod)
+	logWithTime("Pod will be created with name: %s in namespace: %s", pod.Name, pod.Namespace)
+	logWithTime("Pod spec: %+v", pod)
 
 	// Create the pod using the manager's client
-	log.Printf("Attempting to create pod...")
+	logWithTime("Attempting to create pod...")
+	createStart := time.Now()
 	err := mgr.GetClient().Create(ctx, pod)
 	if err != nil {
-		log.Printf("Error creating pod: %v", err)
+		logWithTime("Error creating pod: %v", err)
 		return "", "", fmt.Errorf("create pod %s: %w", podName.String(), err)
 	}
-	log.Printf("Pod creation request sent successfully")
+	logTiming("Pod creation request", createStart)
+	logWithTime("Pod creation request sent successfully")
 
 	// Wait for pod to appear in cache
-	log.Printf("Waiting for pod to appear in cache...")
-	startTime := time.Now()
+	logWithTime("Waiting for pod to appear in cache...")
+	cacheStart := time.Now()
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		var pod corev1.Pod
 		if err := mgr.GetClient().Get(ctx, podName, &pod); err != nil {
 			if kerrors.IsNotFound(err) {
-				log.Printf("Pod not found in cache yet, retrying...")
+				logWithTime("Pod not found in cache yet, retrying...")
 				return false, nil
 			}
-			log.Printf("Error getting pod from cache: %v", err)
+			logWithTime("Error getting pod from cache: %v", err)
 			return false, fmt.Errorf("failed to get pod %s: %w", podName.String(), err)
 		}
-		log.Printf("Pod found in cache after %v", time.Since(startTime))
+		logTiming("Pod found in cache", cacheStart)
 		return true, nil
 	}); err != nil {
-		log.Printf("Timeout waiting for pod to appear in cache after %v: %v", time.Since(startTime), err)
+		logWithTime("Timeout waiting for pod to appear in cache after %v: %v", time.Since(cacheStart), err)
 		return "", "", fmt.Errorf("failed waiting for new pod %s to appear in cache: %w", podName.String(), err)
 	}
 
-	log.Printf("Pod creation completed successfully")
+	logTiming("Total pod creation process", startTime)
+	logWithTime("Pod creation completed successfully")
 	return buildID, pod.Name, nil
 }
 
@@ -160,11 +181,13 @@ func main() {
 	}()
 
 	// Wait for cache to sync
-	log.Printf("Waiting for cache to sync...")
+	logWithTime("Waiting for cache to sync...")
+	syncStart := time.Now()
 	if !mgr.GetCache().WaitForCacheSync(ctx) {
 		log.Fatalf("Failed to sync cache")
 	}
-	log.Printf("Cache synced successfully")
+	logTiming("Cache sync", syncStart)
+	logWithTime("Cache synced successfully")
 
 	// Start the pod
 	buildID, podName, err := startPod(ctx, mgr, "test-job")
@@ -172,5 +195,5 @@ func main() {
 		log.Fatalf("Error starting pod: %v", err)
 	}
 
-	log.Printf("Successfully created pod %s with build ID %s", podName, buildID)
+	logWithTime("Successfully created pod %s with build ID %s", podName, buildID)
 }
