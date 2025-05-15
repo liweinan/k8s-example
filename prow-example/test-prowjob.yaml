@@ -5,22 +5,22 @@ metadata:
   namespace: default
   labels:
     prow.k8s.io/type: presubmit
-    prow.k8s.io/job: unit-test
+    prow.k8s.io/job: unit-test-no-decoration
 spec:
   type: presubmit
   agent: kubernetes
   cluster: default
   namespace: default
-  job: unit-test
+  job: unit-test-no-decoration
   refs:
     org: liweinan
     repo: my-prow-test-proj
     base_ref: main
     base_sha: "abcdef1234567890abcdef1234567890abcdef12"
     pulls:
-    - number: 11
-      author: liweinan
-      sha: "1234567890abcdef1234567890abcdef12345678"
+      - number: 11
+        author: liweinan
+        sha: "1234567890abcdef1234567890abcdef12345678"
   pod_spec:
     containers:
       - image: golang:1.18
