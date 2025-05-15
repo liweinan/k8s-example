@@ -8,7 +8,7 @@ presubmits:
       max_concurrency: 10
       trigger: '(?m)^(/test(\s+|$)|/test all(\s+|$))'
       rerun_command: "/test"
-      extra_refs:
+      refs:
         - org: liweinan
           repo: my-prow-test-proj
           base_ref: main
