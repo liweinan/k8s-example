@@ -17,7 +17,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
@@ -95,6 +94,10 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 }
 
 func main() {
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// Create a kubeconfig similar to Plank's
 	kubeconfig := api.Config{
 		Clusters: map[string]*api.Cluster{
@@ -149,23 +152,19 @@ func main() {
 		log.Fatalf("Error creating manager: %v", err)
 	}
 
-	// Start the manager
+	// Start the manager in a goroutine
 	go func() {
-		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+		if err := mgr.Start(ctx); err != nil {
 			log.Fatalf("Error starting manager: %v", err)
 		}
 	}()
 
 	// Wait for cache to sync
 	log.Printf("Waiting for cache to sync...")
-	if !mgr.GetCache().WaitForCacheSync(signals.SetupSignalHandler()) {
+	if !mgr.GetCache().WaitForCacheSync(ctx) {
 		log.Fatalf("Failed to sync cache")
 	}
 	log.Printf("Cache synced successfully")
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	// Start the pod
 	buildID, podName, err := startPod(ctx, mgr, "test-job")
