@@ -44,6 +44,10 @@ spec:
             echo "Setting up Go environment..."
             export GOPATH=/go
             export PATH=$GOPATH/bin:$PATH
+            export HTTP_PROXY=http://192.168.0.123:1080
+            export HTTPS_PROXY=http://192.168.0.123:1080
+            export NO_PROXY=localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1
+            export GO111MODULE=on
             
             echo "Cloning repository..."
             git clone https://github.com/liweinan/my-prow-test-proj.git $GOPATH/src/github.com/liweinan/my-prow-test-proj
@@ -54,17 +58,6 @@ spec:
             
             echo "Running tests..."
             go test -v ./...
-        env:
-          - name: HTTP_PROXY
-            value: "http://192.168.0.123:1080"
-          - name: HTTPS_PROXY
-            value: "http://192.168.0.123:1080"
-          - name: NO_PROXY
-            value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
-          - name: GO111MODULE
-            value: "on"
-          - name: GOPATH
-            value: "/go"
         resources:
           limits:
             cpu: 500m
