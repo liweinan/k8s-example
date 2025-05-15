@@ -78,3 +78,6 @@ spec:
       path_strategy: "explicit"
       default_org: "liweinan"
       default_repo: "my-prow-test-proj"
+status:
+  state: triggered
+  startTime: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
