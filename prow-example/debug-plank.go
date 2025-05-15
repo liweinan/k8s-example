@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-	"sigs.k8s.io/controller-runtime/pkg/server"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string, string, error) {
@@ -135,7 +135,7 @@ func main() {
 			},
 			SyncPeriod: 10 * time.Second,
 		},
-		Metrics: server.Options{
+		Metrics: metricsserver.Options{
 			BindAddress: "0",
 		},
 	})
