@@ -126,11 +126,8 @@ func main() {
 	}
 
 	mgr, err := manager.New(cfg, manager.Options{
-		Scheme: scheme,
-		// Match plank's cache settings
-		Cache: manager.CacheOptions{
-			SyncPeriod: 10 * time.Second,
-		},
+		Scheme:     scheme,
+		SyncPeriod: 10 * time.Second,
 	})
 	if err != nil {
 		log.Fatalf("Error creating manager: %v", err)
