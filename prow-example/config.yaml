@@ -34,8 +34,14 @@ prow:
       - repos:
           - liweinan/my-prow-test-proj
         labels:
-          - approved
           - lgtm
+          - approved
+        missingLabels:
+          - do-not-merge
+          - do-not-merge/hold
+          - do-not-merge/work-in-progress
+          - do-not-merge/invalid-owners-file
+        reviewApprovedRequired: true
   sinker:
     resync_period: 1h
     max_prowjob_age: 168h

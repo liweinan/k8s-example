@@ -3,6 +3,14 @@ kind: ProwJob
 metadata:
   name: test-job-$(date +%s)
   namespace: default
+  labels:
+    created-by-prow: "true"
+    prow.k8s.io/context: unit-test
+    prow.k8s.io/job: unit-test
+    prow.k8s.io/type: presubmit
+  annotations:
+    prow.k8s.io/context: unit-test
+    prow.k8s.io/job: unit-test
 spec:
   type: presubmit
   agent: kubernetes
@@ -19,8 +27,7 @@ spec:
         sha: 1234567890abcdef1234567890abcdef12345678
   pod_spec:
     containers:
-      - name: test
-        image: golang:1.18
+      - image: golang:1.18
         command:
           - /bin/sh
           - -c
