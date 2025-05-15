@@ -6,7 +6,7 @@ presubmits:
       agent: kubernetes
       cluster: default
       max_concurrency: 10
-      trigger: "(?m)^(/test(\s+|$)|/test all(\s+|$))"
+      trigger: '(?m)^(/test(\s+|$)|/test all(\s+|$))'
       rerun_command: "/test"
       extra_refs:
         - org: liweinan
@@ -74,7 +74,7 @@ presubmits:
       agent: kubernetes
       cluster: default
       max_concurrency: 10
-      trigger: "(?m)^(/test-no-decoration(\s+|$)|/test all(\s+|$))"
+      trigger: '(?m)^(/test-no-decoration(\s+|$)|/test all(\s+|$))'
       rerun_command: "/test-no-decoration"
       spec:
         containers:
