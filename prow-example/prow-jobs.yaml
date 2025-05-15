@@ -58,9 +58,45 @@ presubmits:
         containers:
           - image: golang:1.18
             command:
-              - go
+              - /bin/sh
             args:
-              - test
+              - -c
+              - |
+                echo "Working directory: $PWD"
+                echo "Listing directory contents:"
+                ls -R /go/src/math-project
+                echo "Checking file permissions:"
+                ls -l /go/src/math-project/go.mod
+                ls -l /go/src/math-project/math.go
+                ls -l /go/src/math-project/math_test.go
+                echo "Checking go.mod:"
+                cat /go/src/math-project/go.mod
+                echo "Checking math.go:"
+                cat /go/src/math-project/math.go
+                echo "Checking math_test.go:"
+                cat /go/src/math-project/math_test.go
+                echo "Proxy settings:"
+                echo "HTTP_PROXY=$HTTP_PROXY"
+                echo "HTTPS_PROXY=$HTTPS_PROXY"
+                echo "NO_PROXY=$NO_PROXY"
+                echo "Go environment:"
+                go env
+                echo "Listing Go packages:"
+                go list ./...
+                echo "Running go test on specific package:"
+                go test -v .
+                echo "Running go test recursive:"
+                go test -v ./...
+            workingDir: "/go/src/math-project"
+            env:
+              - name: HTTP_PROXY
+                value: "http://192.168.0.123:1080"
+              - name: HTTPS_PROXY
+                value: "http://192.168.0.123:1080"
+              - name: NO_PROXY
+                value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
+              - name: GO111MODULE
+                value: "on"
             resources:
               requests:
                 cpu: "100m"
@@ -68,3 +104,10 @@ presubmits:
               limits:
                 cpu: "500m"
                 memory: "500Mi"
+            volumeMounts:
+              - name: math-project
+                mountPath: "/go/src/math-project"
+        volumes:
+          - name: math-project
+            configMap:
+              name: math-project
