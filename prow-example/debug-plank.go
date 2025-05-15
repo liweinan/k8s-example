@@ -102,11 +102,57 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 			logWithTime("Error getting pod from cache: %v", err)
 			return false, fmt.Errorf("failed to get pod %s: %w", podName.String(), err)
 		}
+
+		// Log pod status and conditions
+		logWithTime("Pod status: Phase=%s, Message=%s, Reason=%s", pod.Status.Phase, pod.Status.Message, pod.Status.Reason)
+		for _, condition := range pod.Status.Conditions {
+			logWithTime("Pod condition: Type=%s, Status=%s, Reason=%s, Message=%s",
+				condition.Type, condition.Status, condition.Reason, condition.Message)
+		}
+
+		// Log container statuses
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			logWithTime("Container status: Name=%s, State=%+v, Ready=%v",
+				containerStatus.Name, containerStatus.State, containerStatus.Ready)
+		}
+
 		logTiming("Pod found in cache", cacheStart)
 		return true, nil
 	}); err != nil {
 		logWithTime("Timeout waiting for pod to appear in cache after %v: %v", time.Since(cacheStart), err)
 		return "", "", fmt.Errorf("failed waiting for new pod %s to appear in cache: %w", podName.String(), err)
+	}
+
+	// Wait for pod to be ready
+	logWithTime("Waiting for pod to be ready...")
+	readyStart := time.Now()
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		var pod corev1.Pod
+		if err := mgr.GetClient().Get(ctx, podName, &pod); err != nil {
+			return false, fmt.Errorf("failed to get pod %s: %w", podName.String(), err)
+		}
+
+		// Check if pod is ready
+		if pod.Status.Phase == corev1.PodRunning {
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+					logTiming("Pod ready", readyStart)
+					return true, nil
+				}
+			}
+		}
+
+		// Log pod status while waiting
+		logWithTime("Pod not ready yet: Phase=%s", pod.Status.Phase)
+		for _, condition := range pod.Status.Conditions {
+			logWithTime("Pod condition: Type=%s, Status=%s, Reason=%s, Message=%s",
+				condition.Type, condition.Status, condition.Reason, condition.Message)
+		}
+
+		return false, nil
+	}); err != nil {
+		logWithTime("Timeout waiting for pod to be ready after %v: %v", time.Since(readyStart), err)
+		return "", "", fmt.Errorf("failed waiting for pod %s to be ready: %w", podName.String(), err)
 	}
 
 	logTiming("Total pod creation process", startTime)
