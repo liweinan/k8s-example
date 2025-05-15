@@ -12,7 +12,7 @@ presubmits:
         - org: liweinan
           repo: my-prow-test-proj
           base_ref: main
-      pod_spec:
+      spec:
         containers:
           - image: golang:1.18
             command:
@@ -41,7 +41,7 @@ presubmits:
       max_concurrency: 10
       trigger: "(?m)^/test-no-decoration(\\s+|$)"
       rerun_command: "/test-no-decoration"
-      pod_spec:
+      spec:
         containers:
           - image: golang:1.18
             command:
