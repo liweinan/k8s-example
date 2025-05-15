@@ -46,18 +46,16 @@ spec:
     repo: my-prow-test-proj
     repo_link: https://github.com/liweinan/my-prow-test-proj
   pod_spec:
+    serviceAccountName: plank
     containers:
-      - image: golang:1.18
+      - name: test
+        image: busybox
         command:
           - /bin/sh
           - -c
           - |
-            echo "Working directory: $PWD"
-            echo "Proxy settings:"
-            echo "HTTP_PROXY=$HTTP_PROXY"
-            echo "HTTPS_PROXY=$HTTPS_PROXY"
-            echo "NO_PROXY=$NO_PROXY"
-            sleep 3600
+            echo "Starting sleep..."
+            sleep infinity
         resources:
           limits:
             cpu: 500m
@@ -65,6 +63,7 @@ spec:
           requests:
             cpu: 100m
             memory: 100Mi
+    restartPolicy: Never
   decoration_config:
     timeout: 2h
     grace_period: 15s
