@@ -9,12 +9,12 @@ cat test-prowjob.yaml | sed "s/test-job-\$(date +%s)/$JOB_NAME/" | kubectl apply
 
 # Wait for the ProwJob to be created
 echo "Waiting for ProwJob to be created..."
-kubectl wait --for=condition=created prowjob/$JOB_NAME --timeout=30s
+k8s kubectl wait --for=condition=created prowjob/$JOB_NAME --timeout=30s
 
 # Get the ProwJob status
 echo "ProwJob status:"
-kubectl get prowjob $JOB_NAME -o yaml
+k8s kubectl get prowjob $JOB_NAME -o yaml
 
 # Watch the pod creation
 echo "Watching pod creation..."
-kubectl get pods -w | grep $JOB_NAME
+k8s kubectl get pods -w | grep $JOB_NAME
