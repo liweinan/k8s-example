@@ -18,8 +18,9 @@ data:
           bucket: "prow-artifacts"
           path_strategy: "explicit"
         gcs_credentials_secret: "gcs-credentials"
-      pod_pending_timeout: 10000000000  # 10 seconds
-      pod_unscheduled_timeout: 10000000000  # 10 seconds
+      pod_pending_timeout: 30000000000  # 30 seconds
+      pod_unscheduled_timeout: 30000000000  # 30 seconds
+      pod_running_timeout: 7200000000000  # 2 hours
     sinker:
       resync_period: 1m
       max_prowjob_age: 24h
