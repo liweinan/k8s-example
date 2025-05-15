@@ -14,11 +14,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
+
+// durationPtr returns a pointer to the given duration
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
+}
 
 func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string, string, error) {
 	log.Printf("Starting pod creation for job %s", jobName)
@@ -133,7 +139,7 @@ func main() {
 			DefaultNamespaces: map[string]cache.Config{
 				"default": {},
 			},
-			SyncPeriod: 10 * time.Second,
+			SyncPeriod: ptr.To(10 * time.Second),
 		},
 		Metrics: metricsserver.Options{
 			BindAddress: "0",
