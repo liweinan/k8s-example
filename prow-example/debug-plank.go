@@ -39,14 +39,20 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 	buildID := fmt.Sprintf("build-%d", time.Now().Unix())
 	logWithTime("Generated build ID: %s", buildID)
 
-	// Create pod spec
+	// Create pod spec with Plank-like configuration
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", jobName, buildID),
 			Namespace: "default",
 			Labels: map[string]string{
-				"created-by-prow": "true",
-				"build-id":        buildID,
+				"created-by-prow":  "true",
+				"build-id":         buildID,
+				"prow.k8s.io/job":  jobName,
+				"prow.k8s.io/type": "periodic",
+			},
+			Annotations: map[string]string{
+				"prow.k8s.io/job":  jobName,
+				"prow.k8s.io/type": "periodic",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -68,9 +74,22 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 							corev1.ResourceMemory: resource.MustParse("200Mi"),
 						},
 					},
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						RunAsUser:    ptr.To(int64(1000)),
+					},
 				},
 			},
 			RestartPolicy: corev1.RestartPolicyNever,
+			DNSPolicy:     corev1.DNSClusterFirst,
+			NodeSelector: map[string]string{
+				"kubernetes.io/os": "linux",
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot: ptr.To(true),
+				RunAsUser:    ptr.To(int64(1000)),
+			},
 		},
 	}
 
@@ -89,7 +108,7 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 	logTiming("Pod creation request", createStart)
 	logWithTime("Pod creation request sent successfully")
 
-	// Wait for pod to appear in cache
+	// Wait for pod to appear in cache (mimicking Plank's behavior)
 	logWithTime("Waiting for pod to appear in cache...")
 	cacheStart := time.Now()
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
@@ -123,7 +142,7 @@ func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string,
 		return "", "", fmt.Errorf("failed waiting for new pod %s to appear in cache: %w", podName.String(), err)
 	}
 
-	// Wait for pod to be ready
+	// Wait for pod to be ready with Plank-like timeouts
 	logWithTime("Waiting for pod to be ready...")
 	readyStart := time.Now()
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
