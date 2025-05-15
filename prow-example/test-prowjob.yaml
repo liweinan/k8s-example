@@ -80,4 +80,4 @@ spec:
       default_repo: "my-prow-test-proj"
 status:
   state: triggered
-  startTime: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  startTime: "2024-05-15T07:10:18Z"
