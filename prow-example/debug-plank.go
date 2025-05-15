@@ -12,12 +12,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	"sigs.k8s.io/controller-runtime/pkg/server"
 )
 
 func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string, string, error) {
@@ -129,11 +129,13 @@ func main() {
 
 	mgr, err := manager.New(cfg, manager.Options{
 		Scheme: scheme,
-		// Match plank's cache settings
-		SyncPeriod: 10 * time.Second,
-		NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-			opts.SyncPeriod = 10 * time.Second
-			return cache.New(config, opts)
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				"default": {},
+			},
+		},
+		Metrics: server.Options{
+			BindAddress: "0",
 		},
 	})
 	if err != nil {
