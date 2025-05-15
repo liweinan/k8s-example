@@ -23,37 +23,14 @@ spec:
         image: golang:1.18
         command:
           - /bin/sh
-        args:
           - -c
           - |
             echo "Working directory: $PWD"
-            echo "Listing directory contents:"
-            ls -R /go/src/github.com/liweinan/my-prow-test-proj
-            echo "Checking file permissions:"
-            ls -l /go/src/github.com/liweinan/my-prow-test-proj/go.mod || echo "go.mod not found"
-            echo "Checking go.mod:"
-            cat /go/src/github.com/liweinan/my-prow-test-proj/go.mod || echo "go.mod not readable"
             echo "Proxy settings:"
             echo "HTTP_PROXY=$HTTP_PROXY"
             echo "HTTPS_PROXY=$HTTPS_PROXY"
             echo "NO_PROXY=$NO_PROXY"
-            echo "Go environment:"
-            go env
-            echo "Listing Go packages:"
-            go list ./... || echo "No packages found"
-            echo "Running go test recursive:"
-            go test -v ./... || echo "go test failed, sleeping to debug..."
-            sleep 30
-        workingDir: "/go/src/github.com/liweinan/my-prow-test-proj"
-        env:
-          - name: HTTP_PROXY
-            value: "http://192.168.0.123:1080"
-          - name: HTTPS_PROXY
-            value: "http://192.168.0.123:1080"
-          - name: NO_PROXY
-            value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
-          - name: GO111MODULE
-            value: "on"
+            sleep 3600
         resources:
           requests:
             cpu: 100m
