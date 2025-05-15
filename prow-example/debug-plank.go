@@ -14,8 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	"sigs.k8s.io/controller-runtime/pkg/rest"
 )
 
 func startPod(ctx context.Context, mgr manager.Manager, jobName string) (string, string, error) {
@@ -126,8 +128,13 @@ func main() {
 	}
 
 	mgr, err := manager.New(cfg, manager.Options{
-		Scheme:     scheme,
+		Scheme: scheme,
+		// Match plank's cache settings
 		SyncPeriod: 10 * time.Second,
+		NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+			opts.SyncPeriod = 10 * time.Second
+			return cache.New(config, opts)
+		},
 	})
 	if err != nil {
 		log.Fatalf("Error creating manager: %v", err)
