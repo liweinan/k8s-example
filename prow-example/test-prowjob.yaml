@@ -7,7 +7,7 @@ spec:
   type: presubmit
   agent: kubernetes
   cluster: default
-  job: test-job
+  job: unit-test
   refs:
     org: liweinan
     repo: my-prow-test-proj
