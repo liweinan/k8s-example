@@ -1,37 +1,55 @@
 presubmits:
-  liweinan/my-prow-test-proj:  # Update this to match your repository
+  liweinan/my-prow-test-proj:
     - name: unit-test
       always_run: true
-      decorate: true
       agent: kubernetes
       cluster: default
       max_concurrency: 10
-      trigger: "(?m)^/test(\\s+|$)"
+      trigger: '(?m)^(/test(\s+|$)|/test all(\s+|$))'
       rerun_command: "/test"
-      decoration_config:
-        timeout: "2h"  # 2 hours as duration string
-        grace_period: "15s"  # 15 seconds as duration string
-        gcs_configuration:
-          bucket: "prow-artifacts"
-          path_strategy: "explicit"
-          default_org: "liweinan"
-          default_repo: "my-prow-test-proj"
-        utility_images:
-          clonerefs: "gcr.io/k8s-prow/clonerefs:v20240417-2e0c1c0c0"
-          initupload: "gcr.io/k8s-prow/initupload:v20240417-2e0c1c0c0"
-          entrypoint: "gcr.io/k8s-prow/entrypoint:v20240417-2e0c1c0c0"
-          sidecar: "gcr.io/k8s-prow/sidecar:v20240417-2e0c1c0c0"
+      refs:
+        - org: liweinan
+          repo: my-prow-test-proj
+          base_ref: main
       spec:
         containers:
-          - image: golang:1.18
+          - name: test
+            image: golang:1.21
             command:
-              - go
-            args:
-              - test
+              - /bin/sh
+              - -c
+              - |
+                set -e
+                echo "Setting up Go environment..."
+                export GOPATH=/go
+                export PATH=$GOPATH/bin:$PATH
+                export HTTP_PROXY=http://192.168.0.123:1080
+                export HTTPS_PROXY=http://192.168.0.123:1080
+                export NO_PROXY=localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1
+                export GO111MODULE=on
+
+                echo "Current working directory: $PWD"
+                echo "Listing /go directory contents:"
+                ls -la /go
+
+                echo "Cloning repository..."
+                REPO_PATH=$GOPATH/src/github.com/liweinan/my-prow-test-proj
+                mkdir -p $REPO_PATH
+                git clone https://github.com/liweinan/my-prow-test-proj.git $REPO_PATH
+                cd $REPO_PATH
+
+                echo "Repository contents:"
+                ls -la
+
+                echo "Running go mod tidy..."
+                go mod tidy
+
+                echo "Running tests..."
+                go test -v ./...
             resources:
-              requests:
-                cpu: "100m"
-                memory: "100Mi"
               limits:
-                cpu: "500m"
-                memory: "500Mi"
+                cpu: 500m
+                memory: 500Mi
+              requests:
+                cpu: 100m
+                memory: 100Mi

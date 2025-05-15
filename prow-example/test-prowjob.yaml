@@ -1,0 +1,84 @@
+apiVersion: prow.k8s.io/v1
+kind: ProwJob
+metadata:
+  name: test-job-$(date +%s)
+  namespace: default
+  labels:
+    created-by-prow: "true"
+    event-GUID: "test-event-guid"
+    prow.k8s.io/context: unit-test
+    prow.k8s.io/is-optional: "false"
+    prow.k8s.io/job: unit-test
+    prow.k8s.io/refs.base_ref: main
+    prow.k8s.io/refs.org: liweinan
+    prow.k8s.io/refs.repo: my-prow-test-proj
+    prow.k8s.io/type: presubmit
+  annotations:
+    prow.k8s.io/context: unit-test
+    prow.k8s.io/job: unit-test
+spec:
+  type: presubmit
+  agent: kubernetes
+  cluster: default
+  context: unit-test
+  job: unit-test
+  max_concurrency: 10
+  namespace: default
+  report: true
+  rerun_command: /test
+  prowjob_defaults:
+    tenant_id: GlobalDefaultID
+  refs:
+    base_ref: main
+    org: liweinan
+    repo: my-prow-test-proj
+    base_sha: "0000000000000000000000000000000000000000"
+    pulls:
+      - number: 1
+        author: test
+        sha: "0000000000000000000000000000000000000000"
+  pod_spec:
+    containers:
+      - name: test
+        image: golang:1.21
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -e
+            echo "Setting up Go environment..."
+            export GOPATH=/go
+            export PATH=$GOPATH/bin:$PATH
+            export HTTP_PROXY=http://192.168.0.123:1080
+            export HTTPS_PROXY=http://192.168.0.123:1080
+            export NO_PROXY=localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1
+            export GO111MODULE=on
+
+            echo "Current working directory: $PWD"
+            echo "Listing /go directory contents:"
+            ls -la /go
+
+            echo "Cloning repository..."
+            REPO_PATH=$GOPATH/src/github.com/liweinan/my-prow-test-proj
+            mkdir -p $REPO_PATH
+            git clone https://github.com/liweinan/my-prow-test-proj.git $REPO_PATH
+            cd $REPO_PATH
+
+            echo "Repository contents:"
+            ls -la
+
+            echo "Running go mod tidy..."
+            go mod tidy
+
+            echo "Running tests..."
+            go test -v ./...
+        resources:
+          limits:
+            cpu: 500m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+status:
+  state: triggered
+  startTime: "2024-05-15T07:10:18Z"

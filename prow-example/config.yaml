@@ -4,6 +4,20 @@ prow:
   pod_namespace: "default"
   plank:
     job_url_template: "https://deck.prow.moicen.com/view/{{.Spec.Job}}/{{.Status.BuildID}}"
+    default_decoration_configs:
+      "*":
+        timeout: "2h"
+        grace_period: "15s"
+        utility_images:
+          clonerefs: "gcr.io/k8s-prow/clonerefs:latest"
+          initupload: "gcr.io/k8s-prow/initupload:latest"
+          entrypoint: "gcr.io/k8s-prow/entrypoint:latest"
+          sidecar: "gcr.io/k8s-prow/sidecar:latest"
+        gcs_configuration:
+          bucket: "prow-artifacts"
+          path_strategy: "explicit"
+          default_org: "liweinan"
+          default_repo: "my-prow-test-proj"
   github:
     app_id: "1263514"
     app_private_key_path: "/etc/github/github-token"
@@ -20,8 +34,14 @@ prow:
       - repos:
           - liweinan/my-prow-test-proj
         labels:
-          - approved
           - lgtm
+          - approved
+        missingLabels:
+          - do-not-merge
+          - do-not-merge/hold
+          - do-not-merge/work-in-progress
+          - do-not-merge/invalid-owners-file
+        reviewApprovedRequired: true
   sinker:
     resync_period: 1h
     max_prowjob_age: 168h

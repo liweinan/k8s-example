@@ -189,6 +189,9 @@ spec:
             - name: kubeconfig
               mountPath: /etc/kubeconfig
               readOnly: true
+            - name: job-config
+              mountPath: /etc/job-config
+              readOnly: true
       volumes:
         - name: config
           configMap:
@@ -197,6 +200,9 @@ spec:
           secret:
             secretName: kubeconfig
             defaultMode: 420
+        - name: job-config
+          configMap:
+            name: job-config
 
 ---
 # Pod Test Deployment
