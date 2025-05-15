@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hook
-  namespace: prow
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -14,58 +14,58 @@ spec:
       labels:
         app: hook
     spec:
-      serviceAccountName: hook  # Only add this line
+      serviceAccountName: hook
       automountServiceAccountToken: true
       containers:
-      - name: hook
-        image: gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
-        command:
-        - /bin/sh
-        - -c
-        - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
-        env:
-        - name: LOGRUS_LEVEL
-          value: "debug"
-        - name: HTTP_PROXY
-          value: "http://${PROXY_IP}:${PROXY_PORT}"
-        - name: HTTPS_PROXY
-          value: "http://${PROXY_IP}:${PROXY_PORT}"
-        - name: NO_PROXY
-          value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-        ports:
-        - containerPort: 8888
-        volumeMounts:
-        - name: hmac
-          mountPath: /etc/hmac
-          readOnly: true
-        - name: github-token
-          mountPath: /etc/github
-          readOnly: true
-        - name: config
-          mountPath: /etc/config
-          readOnly: true
-        - name: plugins
-          mountPath: /etc/plugins
-          readOnly: true
-        - name: job-config
-          mountPath: /etc/job-config
-          readOnly: true
+        - name: hook
+          image: gcr.io/k8s-prow/hook:latest
+          command:
+            - /bin/sh
+            - -c
+            - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
+          env:
+            - name: LOGRUS_LEVEL
+              value: "debug"
+            - name: HTTP_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: HTTPS_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
+          ports:
+            - containerPort: 8888
+          volumeMounts:
+            - name: hmac
+              mountPath: /etc/hmac
+              readOnly: true
+            - name: github-token
+              mountPath: /etc/github
+              readOnly: true
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: plugins
+              mountPath: /etc/plugins
+              readOnly: true
+            - name: job-config
+              mountPath: /etc/job-config
+              readOnly: true
       volumes:
-      - name: hmac
-        secret:
-          secretName: hmac-token
-      - name: github-token
-        secret:
-          secretName: github-token
-      - name: config
-        configMap:
-          name: config
-      - name: plugins
-        configMap:
-          name: plugins
-      - name: job-config
-        configMap:
-          name: job-config
+        - name: hmac
+          secret:
+            secretName: hmac-token
+        - name: github-token
+          secret:
+            secretName: github-token
+        - name: config
+          configMap:
+            name: config
+        - name: plugins
+          configMap:
+            name: plugins
+        - name: job-config
+          configMap:
+            name: job-config
 
 ---
 # Hook Service
@@ -73,14 +73,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: hook
-  namespace: prow
+  namespace: default
 spec:
   selector:
     app: hook
   ports:
-  - port: 8888
-    targetPort: 8888
-    nodePort: 30001
+    - port: 8888
+      targetPort: 8888
+      nodePort: 30001
   type: NodePort
 
 ---
@@ -89,7 +89,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: deck
-  namespace: prow
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -103,25 +103,31 @@ spec:
       serviceAccountName: deck
       automountServiceAccountToken: true
       containers:
-      - name: deck
-        image: gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
-        command:
-        - /bin/sh
-        - -c
-        - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
-        env:
-        - name: LOGRUS_LEVEL
-          value: "debug"
-        ports:
-        - containerPort: 8080
-        volumeMounts:
-        - name: config
-          mountPath: /etc/config
-          readOnly: true
+        - name: deck
+          image: gcr.io/k8s-prow/deck:latest
+          command:
+            - /bin/sh
+            - -c
+            - "apk update && apk add curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && sleep infinity"
+          env:
+            - name: LOGRUS_LEVEL
+              value: "debug"
+            - name: HTTP_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: HTTPS_PROXY
+              value: "http://${PROXY_IP}:${PROXY_PORT}"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
       volumes:
-      - name: config
-        configMap:
-          name: config
+        - name: config
+          configMap:
+            name: config
 
 ---
 # Deck Service
@@ -129,12 +135,128 @@ apiVersion: v1
 kind: Service
 metadata:
   name: deck
-  namespace: prow
+  namespace: default
 spec:
   selector:
     app: deck
   ports:
-  - port: 8080
-    targetPort: 8080
-    nodePort: 30002
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30002
+  type: NodePort
+
+---
+# Prow Controller Manager Deployment (replacing Plank)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prow-controller-manager
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prow-controller-manager
+  template:
+    metadata:
+      labels:
+        app: prow-controller-manager
+    spec:
+      serviceAccountName: plank
+      automountServiceAccountToken: true
+      containers:
+        - name: prow-controller-manager
+          image: gcr.io/k8s-prow/prow-controller-manager:latest
+          command:
+            - /bin/sh
+            - -c
+            - "sleep infinity"
+          env:
+            - name: LOGRUS_LEVEL
+              value: "debug"
+            - name: HTTP_PROXY
+              value: "http://192.168.0.123:1080"
+            - name: HTTPS_PROXY
+              value: "http://192.168.0.123:1080"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
+            - name: KUBECONFIG
+              value: "/etc/kubeconfig/config"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: kubeconfig
+              mountPath: /etc/kubeconfig
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: config
+        - name: kubeconfig
+          secret:
+            secretName: kubeconfig
+            defaultMode: 420
+
+---
+# Pod Test Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-test
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      serviceAccountName: plank
+      automountServiceAccountToken: true
+      containers:
+        - name: pod-test
+          image: golang:1.22-bookworm
+          command:
+            - /bin/sh
+            - -c
+            - "echo 'Acquire::http::Proxy \"http://192.168.0.123:1080\";' > /etc/apt/apt.conf.d/proxy.conf && echo 'Acquire::https::Proxy \"http://192.168.0.123:1080\";' >> /etc/apt/apt.conf.d/proxy.conf && apt-get update && apt-get install -y curl && if ! command -v curl; then echo 'curl installation failed'; exit 1; fi && while [ ! -f /tmp/pod-test ]; do echo 'Waiting for /tmp/pod-test to be copied...'; sleep 5; done && /tmp/pod-test > /tmp/pod-test.log 2>&1 && echo 'Pod test completed, logs at /tmp/pod-test.log' && sleep infinity"
+          env:
+            - name: LOGRUS_LEVEL
+              value: "debug"
+            - name: HTTP_PROXY
+              value: "http://192.168.0.123:1080"
+            - name: HTTPS_PROXY
+              value: "http://192.168.0.123:1080"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
+            - name: KUBECONFIG
+              value: "/etc/kubeconfig/config"
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: "/etc/kubeconfig"
+              readOnly: true
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: kubeconfig
+            defaultMode: 420
+
+---
+# Pod Test Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-test
+  namespace: default
+spec:
+  selector:
+    app: pod-test
+  ports:
+    - port: 8081
+      targetPort: 8081
+      nodePort: 30003
   type: NodePort

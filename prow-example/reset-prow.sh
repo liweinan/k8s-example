@@ -3,8 +3,8 @@
 # 设置脚本为出错时退出
 set -e
 
-# 定义 prow 命名空间
-NAMESPACE="prow"
+# 定义 default 命名空间
+NAMESPACE="default"
 
 # 定义 prow-setup.yaml 文件路径
 PROW_SETUP_FILE="./prow-setup.yaml"
@@ -18,18 +18,18 @@ PROXY_PORT=1080
 PROXY="http://${PROXY_IP}:${PROXY_PORT}"
 
 # 定义 NO_PROXY 设置，排除 Kubernetes API 服务器和服务 CIDR
-NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.152.183.1"
 
 # 定义等待超时时间（秒）
 TIMEOUT=600  # 10 minutes to give Deck more time to start
 
+# 清理 pod-test.tar 和 go-runner 镜像
+echo "清理 pod-test.tar 和 go-runner 镜像..."
+rm pod-test.tar 2>/dev/null || true
+ctr image rm gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0 2>/dev/null || true
+
 # 打印开始信息
 echo "开始清理 Prow 服务..."
-
-# 创建 prow 命名空间（如果不存在）
-echo "创建 prow 命名空间（如果不存在）..."
-k8s kubectl get namespace $NAMESPACE &>/dev/null || k8s kubectl create namespace $NAMESPACE
-echo "prow 命名空间已确保存在"
 
 # 应用 RBAC 配置
 echo "应用 RBAC 配置..."
@@ -51,6 +51,29 @@ echo "验证 deck-token Secret 是否创建..."
 if ! k8s kubectl get secret -n $NAMESPACE deck-token --no-headers >/dev/null 2>&1; then
     echo "错误：deck-token Secret 未创建，请检查 prow-rbac.yaml 或集群状态。"
     k8s kubectl describe secret -n $NAMESPACE deck-token || echo "Secret 不存在。"
+    exit 1
+fi
+
+# 验证 hook ServiceAccount
+echo "验证 hook ServiceAccount 是否创建..."
+if ! k8s kubectl get serviceaccount -n $NAMESPACE hook --no-headers >/dev/null 2>&1; then
+    echo "错误：hook ServiceAccount 未创建，请检查 prow-rbac.yaml 或集群状态。"
+    k8s kubectl describe serviceaccount -n $NAMESPACE hook || echo "ServiceAccount 不存在。"
+    exit 1
+fi
+
+# 验证 plank ServiceAccount 和 token Secret (used by prow-controller-manager)
+echo "验证 plank ServiceAccount 是否创建..."
+if ! k8s kubectl get serviceaccount -n $NAMESPACE plank --no-headers >/dev/null 2>&1; then
+    echo "错误：plank ServiceAccount 未创建，请检查 prow-rbac.yaml 或集群状态。"
+    k8s kubectl describe serviceaccount -n $NAMESPACE plank || echo "ServiceAccount 不存在。"
+    exit 1
+fi
+
+echo "验证 plank-token Secret 是否创建..."
+if ! k8s kubectl get secret -n $NAMESPACE plank-token --no-headers >/dev/null 2>&1; then
+    echo "错误：plank-token Secret 未创建，请检查 prow-rbac.yaml 或集群状态。"
+    k8s kubectl describe secret -n $NAMESPACE plank-token || echo "Secret 不存在。"
     exit 1
 fi
 
@@ -119,6 +142,32 @@ k8s kubectl get crd prowjobs.prow.k8s.io
 # 重新创建必要的 Secret 和 ConfigMap
 echo "重新创建必要的 Secret 和 ConfigMap..."
 
+# 创建 kubeconfig Secret
+echo "创建 kubeconfig Secret..."
+cat <<EOF > /tmp/kubeconfig.yaml
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    server: https://10.152.183.1:443
+  name: default
+contexts:
+- context:
+    cluster: default
+    namespace: default
+    user: plank
+  name: default-context
+current-context: default-context
+users:
+- name: plank
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+EOF
+
+k8s kubectl create secret generic kubeconfig -n $NAMESPACE --from-file=config=/tmp/kubeconfig.yaml
+rm /tmp/kubeconfig.yaml
+
 k8s kubectl create secret -n $NAMESPACE generic hmac-token --from-file=hmac=./secret
 k8s kubectl create secret -n $NAMESPACE generic github-token --from-file=github-token=./alchemy-prow-bot.2025-05-11.private-key.pem
 k8s kubectl create configmap -n $NAMESPACE config --from-file=config.yaml=./config.yaml
@@ -135,39 +184,94 @@ for CONFIGMAP in config plugins job-config; do
     fi
 done
 
-# 导入镜像到 k8s.io 命名空间
-echo "导入镜像到 k8s.io 命名空间..."
-export HTTP_PROXY=$PROXY
-export HTTPS_PROXY=$PROXY
-
-# 拉取镜像
-echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:ko-v20240805-37a08f946..."
-if ! ctr image pull gcr.io/k8s-prow/hook:ko-v20240805-37a08f946; then
-    echo "错误：无法拉取 Hook 镜像 gcr.io/k8s-prow/hook:ko-v20240805-37a08f946，请检查网络、代理设置或镜像是否存在。"
+# 构建 pod-test 二进制文件
+echo "构建 pod-test 二进制文件..."
+# 创建临时目录并复制 pod-test 文件
+mkdir -p /tmp/pod-test
+# Copy the external go.mod file
+if [ ! -f "./go.mod" ]; then
+    echo "错误：go.mod 文件不存在，请确保已创建该文件。"
+    exit 1
+fi
+cp ./go.mod /tmp/pod-test/go.mod
+# Copy the external pod-test.go file
+if [ ! -f "./pod-test.go" ]; then
+    echo "错误：pod-test.go 文件不存在，请确保已创建该文件。"
+    exit 1
+fi
+cp ./pod-test.go /tmp/pod-test/pod-test.go
+cd /tmp/pod-test
+go mod tidy
+go build -o pod-test pod-test.go
+cd -
+if [ ! -f "/tmp/pod-test/pod-test" ]; then
+    echo "错误：无法构建 pod-test 二进制文件，请检查 Go 环境和 pod-test.go 文件。"
     exit 1
 fi
 
-echo "拉取 Deck 镜像 gcr.io/k8s-prow/deck:ko-v20240805-37a08f946..."
-if ! ctr image pull gcr.io/k8s-prow/deck:ko-v20240805-37a08f946; then
-    echo "错误：无法拉取 Deck 镜像 gcr.io/k8s-prow/deck:ko-v20240805-37a08f946，请检查网络、代理设置或镜像是否存在。"
+# 导入镜像到 k8s.io 命名空间
+echo "导入镜像到 k8s.io 命名空间..."
+
+# 拉取镜像
+echo "拉取 Hook 镜像 gcr.io/k8s-prow/hook:latest..."
+if ! ctr image pull gcr.io/k8s-prow/hook:latest; then
+    echo "错误：无法拉取 Hook 镜像 gcr.io/k8s-prow/hook:latest，请检查网络、代理设置或镜像是否存在。"
     exit 1
+fi
+
+echo "拉取 Deck 镜像 gcr.io/k8s-prow/deck:latest..."
+if ! ctr image pull gcr.io/k8s-prow/deck:latest; then
+    echo "错误：无法拉取 Deck 镜像 gcr.io/k8s-prow/deck:latest，请检查网络、代理设置或镜像是否存在。"
+    exit 1
+fi
+
+echo "拉取 Prow Controller Manager 镜像 gcr.io/k8s-prow/prow-controller-manager:latest..."
+if ! ctr image pull gcr.io/k8s-prow/prow-controller-manager:latest; then
+    echo "错误：无法拉取 Prow Controller Manager 镜像 gcr.io/k8s-prow/prow-controller-manager:latest，请检查网络、代理设置或镜像是否存在。"
+    exit 1
+fi
+
+# 拉取 go-runner 镜像（用于 pod-test container）
+echo "拉取 go-runner 镜像..."
+if ! ctr image pull --platform linux/amd64 gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+    echo "错误：无法拉取 go-runner 镜像，请检查网络、代理设置或镜像是否存在。"
+    exit 1
+fi
+
+# 验证镜像是否成功拉取
+echo "验证 go-runner 镜像是否成功拉取..."
+if ! ctr image ls | grep -q gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+    echo "错误：go-runner 镜像未找到，尝试重新拉取..."
+    ctr image rm gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0 2>/dev/null || true
+    if ! ctr image pull --platform linux/amd64 gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+        echo "错误：重新拉取 go-runner 镜像失败，请检查网络、代理设置或镜像是否存在。"
+        exit 1
+    fi
+    if ! ctr image ls | grep -q gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0; then
+        echo "错误：go-runner 镜像仍未找到，请检查 containerd 状态。"
+        exit 1
+    fi
 fi
 
 # 导出镜像
-ctr image export hook.tar gcr.io/k8s-prow/hook:ko-v20240805-37a08f946
-ctr image export deck.tar gcr.io/k8s-prow/deck:ko-v20240805-37a08f946
+ctr image export hook.tar gcr.io/k8s-prow/hook:latest
+ctr image export deck.tar gcr.io/k8s-prow/deck:latest
+ctr image export controller.tar gcr.io/k8s-prow/prow-controller-manager:latest
+ctr image export pod-test.tar gcr.io/k8s-staging-build-image/go-runner:v2.4.0-go1.22.12-bookworm.0
 ctr -n k8s.io image import hook.tar
 ctr -n k8s.io image import deck.tar
-rm hook.tar deck.tar
+ctr -n k8s.io image import controller.tar
+ctr -n k8s.io image import pod-test.tar
+rm hook.tar deck.tar controller.tar pod-test.tar
 
 echo "验证镜像是否导入到 k8s.io 命名空间..."
-ctr -n k8s.io image ls | grep gcr.io/k8s-prow || echo "镜像未找到，请检查 ctr 命令是否成功执行"
+ctr -n k8s.io image ls | grep -E 'gcr.io/k8s-prow|gcr.io/k8s-staging-build-image/go-runner' || echo "镜像未找到，请检查 ctr 命令是否成功执行"
 
 # 重新应用 prow-setup.yaml
 echo "重新应用 prow-setup.yaml..."
 k8s kubectl apply -f $PROW_SETUP_FILE
 
-# 验证 Hook 和 Deck Deployment 是否创建成功
+# 验证 Hook, Deck, Prow Controller Manager, 和 Pod Test Deployment 是否创建成功
 echo "验证 Hook Deployment 是否创建..."
 if ! k8s kubectl get deployment -n $NAMESPACE hook --no-headers >/dev/null 2>&1; then
     echo "错误：Hook Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
@@ -182,8 +286,22 @@ if ! k8s kubectl get deployment -n $NAMESPACE deck --no-headers >/dev/null 2>&1;
     exit 1
 fi
 
+echo "验证 Prow Controller Manager Deployment 是否创建..."
+if ! k8s kubectl get deployment -n $NAMESPACE prow-controller-manager --no-headers >/dev/null 2>&1; then
+    echo "错误：Prow Controller Manager Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
+    k8s kubectl describe deployment -n $NAMESPACE prow-controller-manager || echo "Deployment 不存在。"
+    exit 1
+fi
+
+echo "验证 Pod Test Deployment 是否创建..."
+if ! k8s kubectl get deployment -n $NAMESPACE pod-test --no-headers >/dev/null 2>&1; then
+    echo "错误：Pod Test Deployment 未创建，请检查 prow-setup.yaml 或集群状态。"
+    k8s kubectl describe deployment -n $NAMESPACE pod-test || echo "Deployment 不存在。"
+    exit 1
+fi
+
 # 等待 Pod 进入 Running 状态
-echo "等待 Hook 和 Deck Pod 进入 Running 状态..."
+echo "等待 Hook、Deck、Prow Controller Manager 和 Pod Test Pod 进入 Running 状态..."
 
 # 等待 Hook Pod
 echo "等待 Hook Pod..."
@@ -246,12 +364,6 @@ while true; do
     else
         echo "未找到 Deck Pod，等待中..."
         k8s kubectl get pods -n $NAMESPACE -l app=deck
-        # Describe the ReplicaSet to get more details
-        REPLICASET=$(k8s kubectl get replicaset -n $NAMESPACE -l app=deck --no-headers -o custom-columns=":metadata.name" | head -n 1)
-        if [ -n "$REPLICASET" ]; then
-            echo "Deck ReplicaSet 状态："
-            k8s kubectl describe replicaset -n $NAMESPACE $REPLICASET
-        fi
     fi
     sleep 5
     DECK_TIMEOUT_COUNT=$((DECK_TIMEOUT_COUNT + 5))
@@ -259,10 +371,78 @@ while true; do
         echo "错误：等待 Deck Pod 超时（${TIMEOUT}秒），请检查部署状态："
         k8s kubectl get pods -n $NAMESPACE
         k8s kubectl describe deployment -n $NAMESPACE deck
-        REPLICASET=$(k8s kubectl get replicaset -n $NAMESPACE -l app=deck --no-headers -o custom-columns=":metadata.name" | head -n 1)
-        if [ -n "$REPLICASET" ]; then
-            k8s kubectl describe replicaset -n $NAMESPACE $REPLICASET
+        exit 1
+    fi
+done
+
+# 等待 Prow Controller Manager Pod
+echo "等待 Prow Controller Manager Pod..."
+CONTROLLER_TIMEOUT_COUNT=0
+while true; do
+    CONTROLLER_POD=$(k8s kubectl get pods -n $NAMESPACE -l app=prow-controller-manager --no-headers -o custom-columns=":metadata.name" | head -n 1)
+    if [ -n "$CONTROLLER_POD" ]; then
+        CONTROLLER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.phase")
+        CONTROLLER_READY=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
+        CONTROLLER_CONDITION=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.conditions[?(@.type=='Ready')].status" | grep "False" || true)
+        if [ "$CONTROLLER_STATUS" = "Running" ] && [ -n "$CONTROLLER_READY" ] && [ -z "$CONTROLLER_CONDITION" ]; then
+            echo "Prow Controller Manager Pod ($CONTROLLER_POD) 已进入 Running 状态且 Ready"
+            break
+        else
+            CONTROLLER_CONTAINER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $CONTROLLER_POD --no-headers -o custom-columns=":status.containerStatuses[0].state" | grep "CrashLoopBackOff" || true)
+            if [ -n "$CONTROLLER_CONTAINER_STATUS" ]; then
+                echo "错误：Prow Controller Manager Pod ($CONTROLLER_POD) 处于 CrashLoopBackOff 状态，输出日志："
+                k8s kubectl logs -n $NAMESPACE $CONTROLLER_POD --tail=50
+                k8s kubectl describe pod -n $NAMESPACE $CONTROLLER_POD
+                exit 1
+            fi
+            echo "Prow Controller Manager Pod ($CONTROLLER_POD) 状态: $CONTROLLER_STATUS, Ready: $CONTROLLER_READY，等待中..."
         fi
+    else
+        echo "未找到 Prow Controller Manager Pod，等待中..."
+        k8s kubectl get pods -n $NAMESPACE -l app=prow-controller-manager
+    fi
+    sleep 5
+    CONTROLLER_TIMEOUT_COUNT=$((CONTROLLER_TIMEOUT_COUNT + 5))
+    if [ $CONTROLLER_TIMEOUT_COUNT -ge $TIMEOUT ]; then
+        echo "错误：等待 Prow Controller Manager Pod 超时（${TIMEOUT}秒），请检查部署状态："
+        k8s kubectl get pods -n $NAMESPACE
+        k8s kubectl describe deployment -n $NAMESPACE prow-controller-manager
+        exit 1
+    fi
+done
+
+# 等待 Pod Test Pod
+echo "等待 Pod Test Pod..."
+POD_TEST_TIMEOUT_COUNT=0
+while true; do
+    POD_TEST_POD=$(k8s kubectl get pods -n $NAMESPACE -l app=pod-test --no-headers -o custom-columns=":metadata.name" | head -n 1)
+    if [ -n "$POD_TEST_POD" ]; then
+        POD_TEST_STATUS=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.phase")
+        POD_TEST_READY=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.containerStatuses[0].ready" | grep "true" || true)
+        POD_TEST_CONDITION=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.conditions[?(@.type=='Ready')].status" | grep "False" || true)
+        if [ "$POD_TEST_STATUS" = "Running" ] && [ -n "$POD_TEST_READY" ] && [ -z "$POD_TEST_CONDITION" ]; then
+            echo "Pod Test Pod ($POD_TEST_POD) 已进入 Running 状态且 Ready"
+            break
+        else
+            POD_TEST_CONTAINER_STATUS=$(k8s kubectl get pod -n $NAMESPACE $POD_TEST_POD --no-headers -o custom-columns=":status.containerStatuses[0].state" | grep "CrashLoopBackOff" || true)
+            if [ -n "$POD_TEST_CONTAINER_STATUS" ]; then
+                echo "错误：Pod Test Pod ($POD_TEST_POD) 处于 CrashLoopBackOff 状态，输出日志："
+                k8s kubectl logs -n $NAMESPACE $POD_TEST_POD --tail=50
+                k8s kubectl describe pod -n $NAMESPACE $POD_TEST_POD
+                exit 1
+            fi
+            echo "Pod Test Pod ($POD_TEST_POD) 状态: $POD_TEST_STATUS, Ready: $POD_TEST_READY，等待中..."
+        fi
+    else
+        echo "未找到 Pod Test Pod，等待中..."
+        k8s kubectl get pods -n $NAMESPACE -l app=pod-test
+    fi
+    sleep 5
+    POD_TEST_TIMEOUT_COUNT=$((POD_TEST_TIMEOUT_COUNT + 5))
+    if [ $POD_TEST_TIMEOUT_COUNT -ge $TIMEOUT ]; then
+        echo "错误：等待 Pod Test Pod 超时（${TIMEOUT}秒），请检查部署状态："
+        k8s kubectl get pods -n $NAMESPACE
+        k8s kubectl describe deployment -n $NAMESPACE pod-test
         exit 1
     fi
 done
@@ -310,6 +490,36 @@ while true; do
         if [ $DECK_PORT_TIMEOUT -ge $TIMEOUT ]; then
             echo "错误：等待 Deck 端口 8080 超时（${TIMEOUT}秒），输出日志："
             k8s kubectl exec -n $NAMESPACE $DECK_POD -- /bin/sh -c "cat /tmp/deck.log | tail -50"
+            exit 1
+        fi
+    fi
+done
+
+# 启动 Prow Controller Manager 容器内的命令
+echo "启动 Prow Controller Manager 容器内的命令..."
+k8s kubectl exec -n $NAMESPACE $CONTROLLER_POD -- /bin/sh -c "(export HTTP_PROXY=$PROXY && export HTTPS_PROXY=$PROXY && export NO_PROXY=$NO_PROXY && export LOGRUS_LEVEL=debug && /ko-app/prow-controller-manager --enable-controller=plank --config-path=/etc/config/config.yaml --kubeconfig=/etc/kubeconfig/config > /tmp/controller.log 2>&1 &)"
+
+# 复制 pod-test 二进制文件到 Pod Test 容器
+echo "复制 pod-test 二进制文件到 Pod Test 容器..."
+k8s kubectl cp /tmp/pod-test/pod-test $NAMESPACE/$POD_TEST_POD:/tmp/pod-test
+
+# 验证 Pod Test 的测试结果
+echo "验证 Pod Test 的测试结果..."
+POD_TEST_LOG_TIMEOUT=0
+while true; do
+    POD_TEST_LOG_CHECK=$(k8s kubectl exec -n $NAMESPACE $POD_TEST_POD -- /bin/sh -c "[ -f /tmp/pod-test.log ] && echo 'exists'" || echo "not_exists")
+    if [ "$POD_TEST_LOG_CHECK" = "exists" ]; then
+        echo "Pod Test 已生成测试日志，输出测试结果："
+        k8s kubectl exec -n $NAMESPACE $POD_TEST_POD -- /bin/sh -c "cat /tmp/pod-test.log"
+        break
+    else
+        echo "Pod Test 尚未生成测试日志，等待中..."
+        sleep 5
+        POD_TEST_LOG_TIMEOUT=$((POD_TEST_LOG_TIMEOUT + 5))
+        if [ $POD_TEST_LOG_TIMEOUT -ge $TIMEOUT ]; then
+            echo "错误：等待 Pod Test 日志超时（${TIMEOUT}秒），请检查容器状态："
+            k8s kubectl logs -n $NAMESPACE $POD_TEST_POD --tail=50
+            k8s kubectl describe pod -n $NAMESPACE $POD_TEST_POD
             exit 1
         fi
     fi

@@ -1,7 +1,7 @@
+log_level: "debug"
 prow:
-  log_level: "debug"
-  prowjob_namespace: "prow"
-  pod_namespace: "prow"
+  prowjob_namespace: "default"
+  pod_namespace: "default"
   plank:
     job_url_template: "https://deck.prow.moicen.com/view/{{.Spec.Job}}/{{.Status.BuildID}}"
   github:
