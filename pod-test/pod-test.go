@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -16,11 +17,78 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+func verifyEnvironment() {
+	// Print current user and environment
+	fmt.Println("=== Environment Information ===")
+	fmt.Printf("Current user: %s\n", os.Getenv("USER"))
+	fmt.Printf("HOME directory: %s\n", os.Getenv("HOME"))
+	fmt.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
+
+	// Check k8s kubectl
+	if _, err := exec.LookPath("k8s"); err == nil {
+		cmd := exec.Command("k8s", "kubectl", "config", "view")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Error running k8s kubectl config view: %v\n", err)
+		} else {
+			fmt.Println("=== K8s Kubectl Configuration ===")
+			fmt.Println(string(output))
+		}
+	} else {
+		fmt.Println("k8s command not found in PATH")
+	}
+
+	// Check common kubeconfig locations
+	paths := []string{
+		filepath.Join(os.Getenv("HOME"), ".kube", "config"),
+		"/root/.kube/config",
+		"/etc/kubernetes/admin.conf",
+		"/etc/kubernetes/kubeconfig",
+		"/var/snap/k8s/current/kubeconfig",
+	}
+
+	fmt.Println("\n=== Checking kubeconfig locations ===")
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			fmt.Printf("Found kubeconfig at: %s\n", path)
+		} else {
+			fmt.Printf("No kubeconfig at: %s\n", path)
+		}
+	}
+	fmt.Println("===================================")
+}
+
+func getKubeconfigPath() string {
+	// First try KUBECONFIG environment variable
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		return kubeconfig
+	}
+
+	// Try to get config from k8s kubectl
+	cmd := exec.Command("k8s", "kubectl", "config", "view", "--raw")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		// Create a temporary file with the config
+		tmpFile := filepath.Join(os.TempDir(), "kubeconfig")
+		if err := os.WriteFile(tmpFile, output, 0600); err == nil {
+			return tmpFile
+		}
+	}
+
+	// If all else fails, return the default path
+	return filepath.Join(os.Getenv("HOME"), ".kube", "config")
+}
+
 func main() {
 	// Parse command line flags
-	kubeconfig := flag.String("kubeconfig", filepath.Join(os.Getenv("HOME"), ".kube", "config"), "Path to kubeconfig file")
+	kubeconfig := flag.String("kubeconfig", getKubeconfigPath(), "Path to kubeconfig file")
 	namespace := flag.String("namespace", "default", "Namespace to create the pod in")
+	debug := flag.Bool("debug", false, "Enable debug mode to show environment information")
 	flag.Parse()
+
+	if *debug {
+		verifyEnvironment()
+	}
 
 	// Try to get in-cluster config first
 	config, err := rest.InClusterConfig()
@@ -29,7 +97,7 @@ func main() {
 		// If not in cluster, use kubeconfig
 		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
-			log.Fatalf("Error creating client config: %v", err)
+			log.Fatalf("Error creating client config: %v\nPlease ensure you have a valid kubeconfig file at %s", err, *kubeconfig)
 		}
 	}
 
