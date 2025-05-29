@@ -1,26 +1,16 @@
-# Pod Creation Test
+# Pod Test
 
-This is a test project to verify pod creation and cache synchronization in Kubernetes using client-go, similar to how Prow's Plank component works.
-
-## Purpose
-
-The test program helps diagnose issues with:
-- Pod creation permissions
-- Cache synchronization
-- Network connectivity
-- API server responsiveness
-
-It creates a test pod and waits for it to appear in the cache, measuring the time taken for cache synchronization.
+A simple Go program to create and test a minimal Kubernetes pod using the nginx container.
 
 ## Prerequisites
 
 - Go 1.21 or later
-- Access to a Kubernetes cluster
-- kubectl configured to access the cluster
+- Kubernetes cluster (tested with Ubuntu snap k8s)
+- kubectl configured with proper permissions
 
-## Setup
+## Building
 
-1. Initialize the Go module and download dependencies:
+1. Install dependencies:
 ```bash
 go mod tidy
 ```
@@ -30,62 +20,84 @@ go mod tidy
 go build pod-test.go
 ```
 
-## Usage
+## Running
 
-### Running Locally
-
+Run the program with sudo (required for k8s snap):
 ```bash
-./pod-test
+sudo ./pod-test
 ```
 
-### Running Inside a Pod
+Optional flags:
+- `-debug`: Enable debug mode to show environment information
+- `-namespace`: Specify the namespace (default: "default")
+- `-kubeconfig`: Specify the kubeconfig path (default: auto-detected)
 
-1. Copy the binary to the target pod:
+Example with debug mode:
 ```bash
-kubectl cp pod-test <namespace>/<pod-name>:/tmp/
+sudo ./pod-test -debug
 ```
 
-2. Execute the test:
+## Testing the Created Pod
+
+Once the pod is running, you can interact with it in several ways:
+
+1. Get a shell inside the pod:
 ```bash
-kubectl exec -it <namespace>/<pod-name> -- /tmp/pod-test
+sudo k8s kubectl exec -it <pod-name> -- /bin/sh
 ```
 
-## Output
+2. Test the nginx web server:
+```bash
+# From inside the pod
+curl localhost:80
 
-The program will:
-1. Create a test pod with a unique name
-2. Print when the pod is created
-3. Wait for the pod to appear in the cache
-4. Print the time taken for cache synchronization
-
-Example output:
-```
-Creating pod test-pod-20240321123456...
-Pod created: test-pod-20240321123456
-Waiting for pod to appear in cache...
-Pod test-pod-20240321123456 appeared in cache after 1.234s
+# From your host
+curl http://<pod-ip>:80
 ```
 
-## Configuration
+3. View pod logs:
+```bash
+sudo k8s kubectl logs <pod-name>
+```
 
-The program uses the following configuration:
-- Kubernetes API server: https://10.152.183.1:443
-- Service account token: /var/run/secrets/kubernetes.io/serviceaccount/token
-- CA certificate: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-- Namespace: default
-- Pod timeout: 30 seconds
+4. Get pod details:
+```bash
+sudo k8s kubectl describe pod <pod-name>
+```
+
+5. Get pod IP and status:
+```bash
+sudo k8s kubectl get pod <pod-name> -o wide
+```
+
+## Pod Details
+
+The created pod:
+- Uses the nginx:latest image
+- Exposes port 80
+- Runs in the default namespace
+- Has a unique name based on timestamp
+- Includes a readiness check
 
 ## Troubleshooting
 
-If the test fails:
-1. Check if the service account has necessary permissions
-2. Verify network connectivity to the API server
-3. Check API server logs for any errors
-4. Ensure the pod creation timeout is sufficient
+1. If you get permission errors:
+   - Ensure you're running with sudo
+   - Check that your k8s snap installation is working correctly
+
+2. If the pod stays in Pending state:
+   - Check node resources
+   - Verify image pull permissions
+   - Check pod events with `k8s kubectl describe pod <pod-name>`
+
+3. If you can't connect to the pod:
+   - Verify the pod is Running
+   - Check the pod IP with `k8s kubectl get pod <pod-name> -o wide`
+   - Ensure network policies allow the connection
 
 ## Cleanup
 
-The test pod will remain in the cluster after the test. To clean up:
+To delete the test pod:
 ```bash
-kubectl delete pod test-pod-<timestamp>
+sudo k8s kubectl delete pod <pod-name>
 ``` 
