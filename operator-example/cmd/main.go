@@ -20,6 +20,8 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"os/exec"
+	"path/filepath"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -28,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -49,6 +53,22 @@ func init() {
 
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+}
+
+func getKubeconfig() (*rest.Config, error) {
+	// Try to get config from k8s kubectl
+	cmd := exec.Command("k8s", "kubectl", "config", "view", "--raw")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		// Create a temporary file with the config
+		tmpFile := filepath.Join(os.TempDir(), "kubeconfig")
+		if err := os.WriteFile(tmpFile, output, 0600); err == nil {
+			return clientcmd.BuildConfigFromFlags("", tmpFile)
+		}
+	}
+
+	// If all else fails, use the default kubeconfig
+	return clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
 }
 
 func main() {
@@ -94,7 +114,14 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	// Get kubeconfig
+	kubeconfig, err := getKubeconfig()
+	if err != nil {
+		setupLog.Error(err, "unable to get kubeconfig")
+		os.Exit(1)
+	}
+
+	mgr, err := ctrl.NewManager(kubeconfig, ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress:   metricsAddr,
