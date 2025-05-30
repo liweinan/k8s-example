@@ -19,10 +19,11 @@ import (
 
 func verifyEnvironment() {
 	// Print current user and environment
-	fmt.Println("=== Environment Information ===")
+	fmt.Println("\n=== Environment Information ===")
 	fmt.Printf("Current user: %s\n", os.Getenv("USER"))
 	fmt.Printf("HOME directory: %s\n", os.Getenv("HOME"))
 	fmt.Printf("KUBECONFIG: %s\n", os.Getenv("KUBECONFIG"))
+	fmt.Printf("Current working directory: %s\n", getCurrentDir())
 
 	// Check k8s kubectl
 	if _, err := exec.LookPath("k8s"); err == nil {
@@ -31,7 +32,27 @@ func verifyEnvironment() {
 		if err != nil {
 			fmt.Printf("Error running k8s kubectl config view: %v\n", err)
 		} else {
-			fmt.Println("=== K8s Kubectl Configuration ===")
+			fmt.Println("\n=== K8s Kubectl Configuration ===")
+			fmt.Println(string(output))
+		}
+
+		// Get cluster info
+		cmd = exec.Command("k8s", "kubectl", "cluster-info")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Error getting cluster info: %v\n", err)
+		} else {
+			fmt.Println("\n=== Cluster Information ===")
+			fmt.Println(string(output))
+		}
+
+		// Get node info
+		cmd = exec.Command("k8s", "kubectl", "get", "nodes", "-o", "wide")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Error getting node info: %v\n", err)
+		} else {
+			fmt.Println("\n=== Node Information ===")
 			fmt.Println(string(output))
 		}
 	} else {
@@ -51,6 +72,12 @@ func verifyEnvironment() {
 	for _, path := range paths {
 		if _, err := os.Stat(path); err == nil {
 			fmt.Printf("Found kubeconfig at: %s\n", path)
+			// Check file permissions
+			if info, err := os.Stat(path); err == nil {
+				fmt.Printf("  Permissions: %v\n", info.Mode())
+				fmt.Printf("  Size: %d bytes\n", info.Size())
+				fmt.Printf("  Last modified: %v\n", info.ModTime())
+			}
 		} else {
 			fmt.Printf("No kubeconfig at: %s\n", path)
 		}
@@ -58,25 +85,47 @@ func verifyEnvironment() {
 	fmt.Println("===================================")
 }
 
+func getCurrentDir() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Sprintf("Error getting current directory: %v", err)
+	}
+	return dir
+}
+
 func getKubeconfigPath() string {
+	fmt.Println("\n=== Kubeconfig Path Resolution ===")
+
 	// First try KUBECONFIG environment variable
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		fmt.Printf("Using KUBECONFIG from environment: %s\n", kubeconfig)
 		return kubeconfig
 	}
+	fmt.Println("No KUBECONFIG environment variable set")
 
 	// Try to get config from k8s kubectl
+	fmt.Println("\nTrying to get config from k8s kubectl...")
 	cmd := exec.Command("k8s", "kubectl", "config", "view", "--raw")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		// Create a temporary file with the config
 		tmpFile := filepath.Join(os.TempDir(), "kubeconfig")
+		fmt.Printf("Creating temporary kubeconfig at: %s\n", tmpFile)
 		if err := os.WriteFile(tmpFile, output, 0600); err == nil {
+			fmt.Printf("Successfully created temporary kubeconfig\n")
 			return tmpFile
+		} else {
+			fmt.Printf("Failed to create temporary kubeconfig: %v\n", err)
 		}
+	} else {
+		fmt.Printf("Failed to get config from k8s kubectl: %v\n", err)
 	}
 
 	// If all else fails, return the default path
-	return filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	defaultPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	fmt.Printf("\nFalling back to default path: %s\n", defaultPath)
+	fmt.Println("===================================")
+	return defaultPath
 }
 
 func main() {
@@ -130,7 +179,12 @@ func main() {
 	}
 
 	// Create the pod
-	fmt.Printf("Creating pod %s in namespace %s...\n", podName, *namespace)
+	fmt.Printf("\n=== Creating Pod ===\n")
+	fmt.Printf("Name: %s\n", podName)
+	fmt.Printf("Namespace: %s\n", *namespace)
+	fmt.Printf("Image: nginx:latest\n")
+	fmt.Printf("Port: 80\n")
+
 	createdPod, err := clientset.CoreV1().Pods(*namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		log.Fatalf("Error creating pod: %v", err)
@@ -138,19 +192,49 @@ func main() {
 	fmt.Printf("Pod created successfully: %s\n", createdPod.Name)
 
 	// Wait for pod to be ready
-	fmt.Println("Waiting for pod to be ready...")
+	fmt.Println("\n=== Waiting for Pod to be Ready ===")
+	startTime := time.Now()
 	for {
 		pod, err := clientset.CoreV1().Pods(*namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			log.Fatalf("Error getting pod status: %v", err)
 		}
 
+		// Print detailed status
+		fmt.Printf("\nPod Status at %v:\n", time.Now().Format("15:04:05"))
+		fmt.Printf("Phase: %s\n", pod.Status.Phase)
+		fmt.Printf("IP: %s\n", pod.Status.PodIP)
+		fmt.Printf("Node: %s\n", pod.Spec.NodeName)
+
+		if len(pod.Status.ContainerStatuses) > 0 {
+			containerStatus := pod.Status.ContainerStatuses[0]
+			fmt.Printf("Container Status:\n")
+			fmt.Printf("  Ready: %v\n", containerStatus.Ready)
+			fmt.Printf("  State: %v\n", containerStatus.State)
+			if containerStatus.State.Running != nil {
+				fmt.Printf("  Started: %v\n", containerStatus.State.Running.StartedAt)
+			}
+		}
+
 		if pod.Status.Phase == corev1.PodRunning {
-			fmt.Println("Pod is now running!")
+			fmt.Printf("\nPod is now running! (took %v)\n", time.Since(startTime))
 			break
 		}
 
-		fmt.Printf("Pod status: %s\n", pod.Status.Phase)
 		time.Sleep(2 * time.Second)
+	}
+
+	// Print final pod information
+	fmt.Println("\n=== Final Pod Information ===")
+	pod, err = clientset.CoreV1().Pods(*namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+	if err != nil {
+		log.Printf("Error getting final pod status: %v", err)
+	} else {
+		fmt.Printf("Name: %s\n", pod.Name)
+		fmt.Printf("Namespace: %s\n", pod.Namespace)
+		fmt.Printf("IP: %s\n", pod.Status.PodIP)
+		fmt.Printf("Node: %s\n", pod.Spec.NodeName)
+		fmt.Printf("Creation Time: %v\n", pod.CreationTimestamp)
+		fmt.Printf("Phase: %s\n", pod.Status.Phase)
 	}
 }
