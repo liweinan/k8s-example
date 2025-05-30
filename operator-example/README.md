@@ -1,114 +1,142 @@
-# operator-example
-// TODO(user): Add simple overview of use/purpose
+# Application Operator
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+A Kubernetes operator that manages application deployments with a simplified interface. This operator provides a custom resource `Application` that makes it easier to deploy and manage applications in Kubernetes.
 
-## Getting Started
+## Features
 
-### Prerequisites
-- go version v1.21.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+- Simplified application deployment using a single custom resource
+- Automatic creation of Deployments and Services
+- Resource management (CPU and Memory limits/requests)
+- Environment variable configuration
+- Status monitoring and reporting
+- Automatic reconciliation of desired state
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+## Prerequisites
 
-```sh
-make docker-build docker-push IMG=<some-registry>/operator-example:tag
-```
+- Kubernetes cluster
+- kubectl configured to communicate with your cluster
+- Go 1.19 or later
+- Make
 
-**NOTE:** This image ought to be published in the personal registry you specified. 
-And it is required to have access to pull the image from the working environment. 
-Make sure you have the proper permission to the registry if the above commands don’t work.
+## Installation
 
-**Install the CRDs into the cluster:**
-
-```sh
+1. Install the CRD:
+```bash
 make install
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
-
-```sh
-make deploy IMG=<some-registry>/operator-example:tag
+2. Run the operator:
+```bash
+make run
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin 
-privileges or be logged in as admin.
+## Usage
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+### Creating an Application
 
-```sh
-kubectl apply -k config/samples/
+Create an Application resource using the following YAML:
+
+```yaml
+apiVersion: apps.example.com/v1alpha1
+kind: Application
+metadata:
+  name: sample-app
+spec:
+  image: nginx:latest
+  replicas: 3
+  port: 80
+  resources:
+    cpuRequest: "100m"
+    memoryRequest: "128Mi"
+    cpuLimit: "200m"
+    memoryLimit: "256Mi"
+  env:
+    - name: ENVIRONMENT
+      value: production
+    - name: LOG_LEVEL
+      value: info
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
+Apply the configuration:
+```bash
+kubectl apply -f config/samples/apps_v1alpha1_application.yaml
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
+### Application Resource Fields
 
-```sh
-make uninstall
+- `image`: Container image to run
+- `replicas`: Number of desired pods (default: 1)
+- `port`: Port that the application listens on (default: 80)
+- `resources`: Compute resource requirements
+  - `cpuRequest`: CPU request (e.g., "100m", "0.1", "1")
+  - `memoryRequest`: Memory request (e.g., "64Mi", "1Gi")
+  - `cpuLimit`: CPU limit
+  - `memoryLimit`: Memory limit
+- `env`: List of environment variables
+  - `name`: Environment variable name
+  - `value`: Environment variable value
+
+### Monitoring
+
+The operator automatically updates the Application status with:
+- Available replicas
+- Ready replicas
+- Updated replicas
+- Conditions
+
+View the status:
+```bash
+kubectl describe application <application-name>
 ```
 
-**UnDeploy the controller from the cluster:**
+### Generated Resources
 
-```sh
-make undeploy
+The operator automatically creates and manages:
+1. Deployment
+   - Manages the application pods
+   - Handles scaling and updates
+2. Service
+   - Type: ClusterIP
+   - Exposes the application port
+
+View the generated resources:
+```bash
+kubectl get deployments
+kubectl get services
+kubectl get pods
 ```
 
-## Project Distribution
+## Development
 
-Following are the steps to build the installer and distribute this project to users.
+### Project Structure
 
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/operator-example:tag
+```
+operator-example/
+├── api/                    # API definitions
+│   └── v1alpha1/          # v1alpha1 API version
+├── config/                # Configuration files
+│   ├── crd/              # CRD definitions
+│   └── samples/          # Sample resources
+├── internal/             # Internal packages
+│   └── controller/       # Controller implementation
+└── cmd/                  # Command line entry point
 ```
 
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
+### Building
 
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/operator-example/<tag or branch>/dist/install.yaml
+Build the operator:
+```bash
+make build
 ```
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+### Testing
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Run the tests:
+```bash
+make test
+```
 
 ## License
 
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
 
