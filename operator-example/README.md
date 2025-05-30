@@ -1,97 +1,114 @@
-# Kubernetes Operator Example using Kubebuilder
+# operator-example
+// TODO(user): Add simple overview of use/purpose
 
-This example demonstrates how to create a Kubernetes operator using kubebuilder. The operator manages a custom resource called `Website` that automatically creates and manages deployments and services for web applications.
-
-## Prerequisites
-
-- Go 1.21 or later
-- kubebuilder 3.14.0 or later
-- Docker
-- Kubernetes cluster (minikube, kind, or any other cluster)
-- kubectl configured to communicate with your cluster
-
-## Project Structure
-
-```
-operator-example/
-├── api/                    # API definitions
-│   └── v1/                # v1 version of the API
-│       ├── website_types.go
-│       └── website_webhook.go
-├── config/                # Configuration files
-│   ├── crd/              # CRD definitions
-│   ├── rbac/             # RBAC configurations
-│   ├── manager/          # Manager configurations
-│   └── webhook/          # Webhook configurations
-├── controllers/           # Controller implementations
-│   └── website_controller.go
-├── main.go               # Entry point
-└── Makefile             # Build automation
-```
-
-## Features
-
-- Custom Resource Definition (CRD) for Website resources
-- Automatic deployment and service creation
-- Status updates and conditions
-- Webhook validation
-- Metrics and health probes
-- Leader election for high availability
+## Description
+// TODO(user): An in-depth paragraph about your project and overview of use
 
 ## Getting Started
 
-1. Initialize the project:
-   ```bash
-   kubebuilder init --domain example.com --repo github.com/yourusername/operator-example
-   ```
+### Prerequisites
+- go version v1.21.0+
+- docker version 17.03+.
+- kubectl version v1.11.3+.
+- Access to a Kubernetes v1.11.3+ cluster.
 
-2. Create the API:
-   ```bash
-   kubebuilder create api --group web --version v1 --kind Website
-   ```
+### To Deploy on the cluster
+**Build and push your image to the location specified by `IMG`:**
 
-3. Build and deploy:
-   ```bash
-   make docker-build docker-push IMG=yourusername/operator-example:latest
-   make deploy IMG=yourusername/operator-example:latest
-   ```
+```sh
+make docker-build docker-push IMG=<some-registry>/operator-example:tag
+```
 
-4. Create a Website resource:
-   ```yaml
-   apiVersion: web.example.com/v1
-   kind: Website
-   metadata:
-     name: example-website
-   spec:
-     image: nginx:latest
-     replicas: 3
-     port: 80
-   ```
+**NOTE:** This image ought to be published in the personal registry you specified. 
+And it is required to have access to pull the image from the working environment. 
+Make sure you have the proper permission to the registry if the above commands don’t work.
 
-## Development
+**Install the CRDs into the cluster:**
 
-- Run locally:
-  ```bash
-  make run
-  ```
+```sh
+make install
+```
 
-- Run tests:
-  ```bash
-  make test
-  ```
+**Deploy the Manager to the cluster with the image specified by `IMG`:**
 
-- Generate manifests:
-  ```bash
-  make manifests
-  ```
+```sh
+make deploy IMG=<some-registry>/operator-example:tag
+```
 
-## Cleanup
+> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin 
+privileges or be logged in as admin.
 
-To remove the operator and its resources:
-```bash
+**Create instances of your solution**
+You can apply the samples (examples) from the config/sample:
+
+```sh
+kubectl apply -k config/samples/
+```
+
+>**NOTE**: Ensure that the samples has default values to test it out.
+
+### To Uninstall
+**Delete the instances (CRs) from the cluster:**
+
+```sh
+kubectl delete -k config/samples/
+```
+
+**Delete the APIs(CRDs) from the cluster:**
+
+```sh
+make uninstall
+```
+
+**UnDeploy the controller from the cluster:**
+
+```sh
 make undeploy
 ```
 
+## Project Distribution
+
+Following are the steps to build the installer and distribute this project to users.
+
+1. Build the installer for the image built and published in the registry:
+
+```sh
+make build-installer IMG=<some-registry>/operator-example:tag
+```
+
+NOTE: The makefile target mentioned above generates an 'install.yaml'
+file in the dist directory. This file contains all the resources built
+with Kustomize, which are necessary to install this project without
+its dependencies.
+
+2. Using the installer
+
+Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/<org>/operator-example/<tag or branch>/dist/install.yaml
+```
+
+## Contributing
+// TODO(user): Add detailed information on how you would like others to contribute to this project
+
+**NOTE:** Run `make help` for more information on all potential `make` targets
+
+More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+
 ## License
 
-MIT 
+Copyright 2025.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
