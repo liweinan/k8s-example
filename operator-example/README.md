@@ -17,18 +17,84 @@ A Kubernetes operator that manages application deployments with a simplified int
 - kubectl configured to communicate with your cluster
 - Go 1.19 or later
 - Make
+- k8s CLI tool (for k8s kubectl integration)
+- Kubebuilder (for development)
+
+### Installing Kubebuilder
+
+1. Download the latest Kubebuilder release:
+```bash
+# For macOS
+brew install kubebuilder
+
+# For Linux
+# Download the latest release
+curl -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)
+# Make it executable
+chmod +x kubebuilder
+# Move it to a directory in your PATH
+sudo mv kubebuilder /usr/local/bin/
+```
+
+2. Verify the installation:
+```bash
+kubebuilder version
+```
+
+3. Install the required tools:
+```bash
+# Install controller-gen
+go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
+
+# Install kustomize
+go install sigs.k8s.io/kustomize/kustomize/v5@latest
+```
+
+## Development Setup
+
+1. Create a new operator project:
+```bash
+# Create a new directory for your project
+mkdir operator-example
+cd operator-example
+
+# Initialize a new operator project
+kubebuilder init --domain example.com --repo github.com/example/operator-example
+
+# Create a new API
+kubebuilder create api --group apps --version v1alpha1 --kind Application
+```
+
+2. The project structure will be created with:
+   - API definitions in `api/v1alpha1/`
+   - Controller implementation in `internal/controller/`
+   - CRD manifests in `config/crd/`
+   - Sample resources in `config/samples/`
+
+3. Build the project:
+```bash
+# Generate code and manifests
+make generate
+
+# Build the operator
+make build
+```
 
 ## Installation
 
 1. Install the CRD:
 ```bash
-make install
+# This will generate and install the Custom Resource Definition
+sudo -E make install
 ```
 
 2. Run the operator:
 ```bash
-make run
+# This will build and run the operator locally
+sudo -E make run
 ```
+
+The operator will start and begin watching for Application resources. You should see logs indicating that the controller has started successfully.
 
 ## Usage
 
@@ -122,19 +188,68 @@ operator-example/
 └── cmd/                  # Command line entry point
 ```
 
-### Building
+### Building and Running
 
-Build the operator:
+1. Generate CRD and RBAC manifests:
 ```bash
-make build
+# Generate CRD and RBAC manifests
+sudo -E make generate
 ```
+
+2. Install the CRD:
+```bash
+# Install the CRD into the cluster
+sudo -E make install
+```
+
+3. Run the operator:
+```bash
+# Build and run the operator locally
+sudo -E make run
+```
+
+The operator will:
+- Connect to your Kubernetes cluster using k8s kubectl configuration
+- Start watching for Application resources
+- Create and manage Deployments and Services
+- Update Application status
 
 ### Testing
 
-Run the tests:
+1. Create a sample Application:
 ```bash
-make test
+# Apply the sample Application resource
+sudo -E k8s kubectl apply -f config/samples/apps_v1alpha1_application.yaml
 ```
+
+2. Verify the resources:
+```bash
+# Check the Application status
+sudo -E k8s kubectl describe application sample-app
+
+# Check the generated Deployment
+sudo -E k8s kubectl get deployments
+
+# Check the generated Service
+sudo -E k8s kubectl get services
+
+# Check the running pods
+sudo -E k8s kubectl get pods
+```
+
+### Common Issues
+
+1. If you see "no matches for kind 'Application'" error:
+   - Make sure you've run `make install` to install the CRD
+   - Verify the CRD is installed: `k8s kubectl get crd applications.apps.example.com`
+
+2. If you see "unable to get kubeconfig" error:
+   - Ensure k8s kubectl is properly configured
+   - Check that you're running commands with `sudo -E` to preserve environment variables
+
+3. If you see "object has been modified" error:
+   - This is normal during status updates
+   - The operator will automatically retry the operation
 
 ## License
 
