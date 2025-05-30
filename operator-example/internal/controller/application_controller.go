@@ -18,13 +18,11 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,7 +114,8 @@ func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Update the Application status with the deployment status
 	if err := r.updateApplicationStatus(ctx, application, foundDeployment); err != nil {
-		return ctrl.Result{}, err
+		log.Error(err, "Failed to update Application status")
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
@@ -214,22 +213,16 @@ func (r *ApplicationReconciler) serviceForApplication(app *appsv1alpha1.Applicat
 
 // updateApplicationStatus updates the status of the Application resource
 func (r *ApplicationReconciler) updateApplicationStatus(ctx context.Context, app *appsv1alpha1.Application, deployment *appsv1.Deployment) error {
-	app.Status.AvailableReplicas = deployment.Status.AvailableReplicas
-	app.Status.LastUpdateTime = metav1.Now()
+	// Create a copy of the application to modify
+	appCopy := app.DeepCopy()
 
-	// Update conditions
-	condition := metav1.Condition{
-		Type:               "Available",
-		Status:             metav1.ConditionTrue,
-		Reason:             "DeploymentAvailable",
-		Message:            fmt.Sprintf("Deployment has %d available replicas", deployment.Status.AvailableReplicas),
-		LastTransitionTime: metav1.Now(),
-	}
+	// Update the status
+	appCopy.Status.AvailableReplicas = deployment.Status.AvailableReplicas
+	appCopy.Status.ReadyReplicas = deployment.Status.ReadyReplicas
+	appCopy.Status.UpdatedReplicas = deployment.Status.UpdatedReplicas
 
-	// Update the condition in the status
-	meta.SetStatusCondition(&app.Status.Conditions, condition)
-
-	return r.Status().Update(ctx, app)
+	// Use Patch instead of Update to avoid conflicts
+	return r.Status().Patch(ctx, appCopy, client.MergeFrom(app))
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -81,6 +81,12 @@ type ApplicationStatus struct {
 	// AvailableReplicas is the number of available replicas
 	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
 
+	// ReadyReplicas is the number of ready replicas
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
+	// UpdatedReplicas is the number of updated replicas
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+
 	// Conditions represent the latest available observations of the application's current state
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
