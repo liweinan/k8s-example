@@ -1,5 +1,7 @@
 # **Deploying a Minimal Kubernetes Service with NodePort Access**
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/liweinan/k8s-example)
+
 This guide walks you through deploying a simple Nginx web server on Kubernetes and exposing it via **NodePort** for
 external access.
 
