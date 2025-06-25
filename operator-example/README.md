@@ -140,59 +140,102 @@ build-installer: manifests generate kustomize
 
 ```mermaid
 graph TD
-    A[Go Source Code] --> B[controller-gen generate]
-    B --> C[DeepCopy Methods]
-    B --> D[CRD YAML Files]
-    B --> E[RBAC Manifests]
+    A[Developer] --> B[kubebuilder init]
+    B --> C[Project Scaffolding]
+    C --> D[Initial Project Structure]
     
-    F[API Types] --> G[controller-gen manifests]
-    G --> H[CRD Bases]
-    G --> I[RBAC Resources]
+    E[Developer] --> F[kubebuilder create api]
+    F --> G[API Types Generation]
+    G --> H[Controller Scaffolding]
     
-    H --> J[kustomize build config/crd]
-    I --> K[kustomize build config/rbac]
-    L[Manager Config] --> M[kustomize build config/manager]
+    I[Go Source Code] --> J[controller-gen generate]
+    J --> K[DeepCopy Methods]
+    J --> L[CRD YAML Files]
+    J --> M[RBAC Manifests]
     
-    J --> N[config/default/kustomization.yaml]
-    K --> N
-    M --> N
+    N[API Types] --> O[controller-gen manifests]
+    O --> P[CRD Bases]
+    O --> Q[RBAC Resources]
     
-    N --> O[Final Kubernetes Manifests]
-    O --> P[kubectl apply]
+    P --> R[kustomize build config/crd]
+    Q --> S[kustomize build config/rbac]
+    T[Manager Config] --> U[kustomize build config/manager]
     
-    style A fill:#e1f5fe
-    style F fill:#e1f5fe
-    style O fill:#c8e6c9
-    style P fill:#c8e6c9
+    R --> V[config/default/kustomization.yaml]
+    S --> V
+    U --> V
+    
+    V --> W[Final Kubernetes Manifests]
+    W --> X[kubectl apply]
+    
+    style A fill:#e3f2fd
+    style B fill:#e3f2fd
+    style F fill:#e3f2fd
+    style I fill:#e1f5fe
+    style N fill:#e1f5fe
+    style W fill:#c8e6c9
+    style X fill:#c8e6c9
 ```
 
-### Tool Dependencies and Versions
+### Kubebuilder Project Lifecycle
 
-The Makefile manages tool versions and installations:
-
-```makefile
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
-ENVTEST_VERSION ?= latest
-GOLANGCI_LINT_VERSION ?= v1.54.2
-
-## Tool Binaries
-KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
+```mermaid
+graph TB
+    subgraph "Project Initialization"
+        A[kubebuilder init] --> B[Create Project Structure]
+        B --> C[Generate Makefile]
+        B --> D[Setup Go Modules]
+        B --> E[Create Base Configs]
+    end
+    
+    subgraph "API Development"
+        F[kubebuilder create api] --> G[Generate API Types]
+        G --> H[Create Controller]
+        H --> I[Generate CRD Base]
+        I --> J[Setup RBAC]
+    end
+    
+    subgraph "Build Process"
+        K[make generate] --> L[controller-gen object]
+        L --> M[DeepCopy Methods]
+        
+        N[make manifests] --> O[controller-gen rbac/crd]
+        O --> P[CRD/RBAC YAML]
+        
+        Q[make install] --> R[kustomize build]
+        R --> S[Apply to Cluster]
+    end
+    
+    subgraph "Deployment"
+        T[make deploy] --> U[kustomize build default]
+        U --> V[Deploy Operator]
+    end
+    
+    A --> F
+    F --> K
+    K --> N
+    N --> Q
+    Q --> T
+    
+    style A fill:#e3f2fd
+    style F fill:#e3f2fd
+    style K fill:#fff3e0
+    style N fill:#fff3e0
+    style Q fill:#e8f5e8
+    style T fill:#c8e6c9
 ```
 
 ### Kustomize Configuration Layers
 
 ```mermaid
 graph TB
-    subgraph "Base Layer"
+    subgraph "Kubebuilder Generated"
         A[CRD Bases] --> D[config/crd/kustomization.yaml]
         B[RBAC Resources] --> E[config/rbac/kustomization.yaml]
         C[Manager Config] --> F[config/manager/kustomization.yaml]
     end
     
-    subgraph "Default Layer"
+    subgraph "Kustomize Layers"
         D --> G[config/default/kustomization.yaml]
         E --> G
         F --> G
@@ -206,9 +249,9 @@ graph TB
         K --> L[Install to Cluster]
     end
     
-    style A fill:#fff3e0
-    style B fill:#fff3e0
-    style C fill:#fff3e0
+    style A fill:#e3f2fd
+    style B fill:#e3f2fd
+    style C fill:#e3f2fd
     style G fill:#e8f5e8
     style K fill:#c8e6c9
 ```
@@ -218,9 +261,16 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant Dev as Developer
+    participant KB as Kubebuilder
     participant CT as Controller-Tools
     participant K as Kustomize
     participant K8s as Kubernetes
+    
+    Dev->>KB: kubebuilder init
+    KB-->>Dev: Project structure created
+    
+    Dev->>KB: kubebuilder create api
+    KB-->>Dev: API types & controller scaffolded
     
     Dev->>CT: make generate
     Note over CT: Generate DeepCopy methods
@@ -253,9 +303,34 @@ graph LR
     G -->|Yes| H[make docker-build]
     H --> I[make deploy]
     
+    subgraph "Kubebuilder Commands"
+        J[kubebuilder init]
+        K[kubebuilder create api]
+        L[kubebuilder create webhook]
+    end
+    
     style A fill:#e3f2fd
     style E fill:#e8f5e8
     style I fill:#c8e6c9
+    style J fill:#e3f2fd
+    style K fill:#e3f2fd
+    style L fill:#e3f2fd
+```
+
+### Tool Dependencies and Versions
+
+The Makefile manages tool versions and installations:
+
+```makefile
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.3.0
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
+ENVTEST_VERSION ?= latest
+GOLANGCI_LINT_VERSION ?= v1.54.2
+
+## Tool Binaries
+KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
 ```
 
 ## Development Setup
@@ -462,4 +537,3 @@ sudo -E k8s kubectl get pods
 ## License
 
 This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
-
