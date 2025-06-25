@@ -537,3 +537,53 @@ sudo -E k8s kubectl get pods
 ## License
 
 This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+
+---
+
+基于对crd-example项目的分析，如果不使用kubebuilder创建的controller并且不使用webhook，会损失以下功能：
+
+## 1. **自动代码生成功能**
+- **DeepCopy方法**：需要手动实现DeepCopy、DeepCopyInto、DeepCopyObject方法
+- **CRD YAML生成**：需要手动编写和维护CustomResourceDefinition YAML文件
+- **RBAC资源生成**：需要手动创建ClusterRole、Role、RoleBinding等权限配置
+- **Client代码生成**：需要手动生成typed client、informer、lister等代码
+
+## 2. **项目脚手架和结构**
+- **标准项目结构**：需要手动创建符合Kubernetes最佳实践的项目目录结构
+- **Makefile工具链**：需要手动编写构建、测试、部署的Makefile规则
+- **依赖管理**：需要手动配置Go modules和版本管理
+
+## 3. **开发工具集成**
+- **controller-gen集成**：失去与controller-tools的深度集成
+- **kustomize集成**：失去与kustomize的自动化配置管理
+- **测试框架**：失去envtest等测试工具的自动配置
+
+## 4. **Webhook相关功能**
+- **准入控制**：无法实现资源创建/更新时的验证逻辑
+- **默认值设置**：无法自动设置字段默认值
+- **字段验证**：失去基于webhook的复杂验证规则
+- **转换webhook**：无法实现API版本间的自动转换
+
+## 5. **监控和可观测性**
+- **Metrics端点**：需要手动配置Prometheus metrics
+- **健康检查**：需要手动实现健康检查端点
+- **日志配置**：失去标准化的日志配置
+
+## 6. **部署和运维**
+- **多架构支持**：失去自动的多平台镜像构建支持
+- **证书管理**：webhook相关的TLS证书需要手动管理
+- **Leader选举**：需要手动实现controller的leader选举机制
+
+## 7. **开发效率**
+- **快速迭代**：失去热重载和快速开发体验
+- **调试工具**：失去集成的调试和profiling工具
+- **文档生成**：失去自动的API文档生成
+
+## 8. **最佳实践**
+- **安全配置**：失去默认的安全最佳实践配置
+- **资源限制**：需要手动配置资源请求和限制
+- **错误处理**：失去标准化的错误处理模式
+
+## 总结
+
+虽然不使用kubebuilder和webhook仍然可以创建自定义控制器，但会失去大量的自动化功能、开发效率和最佳实践支持。对于生产环境的operator开发，这些功能的缺失会显著增加开发复杂度和维护成本。
