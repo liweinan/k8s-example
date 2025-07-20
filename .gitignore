@@ -26,3 +26,10 @@ secret
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Go specific
+pod-test/go.sum
+prow-example/go.sum
+
+# Prow specific
+prow-example/debug-plank
