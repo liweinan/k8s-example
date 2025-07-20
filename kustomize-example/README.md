@@ -16,6 +16,7 @@ This project demonstrates a minimal usage of Kustomize to manage Kubernetes conf
 -   **Configuration Reuse**: Kustomize excels at reusing a common `base` configuration across multiple environments (`overlays`) without duplicating YAML files. `kubectl apply -f` requires manual copying and modification for each environment.
 -   **Template-Free**: Kustomize works by patching standard YAML files, avoiding the complexity of templating languages like Helm.
 -   **Environment Management**: With Kustomize, the differences between environments are clearly defined in patches, making the configuration easier to manage and understand.
+-   **Integration with kubectl**: Kustomize started as a standalone tool and was integrated into `kubectl` starting with version 1.14, which allows you to use it directly via `kubectl apply -k`.
 
 ## Usage
 
