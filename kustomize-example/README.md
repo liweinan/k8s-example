@@ -4,20 +4,14 @@ This project demonstrates a minimal usage of Kustomize to manage Kubernetes conf
 
 ## Structure
 
-- `base`: Contains the base Kubernetes resources (deployment and service).
-- `overlays`: Contains environment-specific configurations.
-  - `staging`: Overrides the base configuration for the staging environment.
-  - `production`: Overrides the base configuration for the production environment.
+-   `base`: Contains the base Kubernetes resources (deployment and service).
+-   `overlays`: Contains environment-specific configurations.
+    -   `staging`: Overrides the base configuration for the staging environment.
+    -   `production`: Overrides the base configuration for the production environment.
 
 ## Usage
 
-To apply the configurations, use `kubectl` with the `-k` flag, which points to a directory containing a `kustomization.yaml` file.
-
-### Apply Base Configuration
-
-```bash
-kubectl apply -k base
-```
+To apply the configurations, you use `kubectl` with the `-k` flag pointing to an overlay directory (`staging` or `production`). Kustomize automatically includes the `base` resources and merges the overlay-specific patches, so you only need to apply the overlay.
 
 ### Apply Staging Configuration
 
@@ -25,7 +19,7 @@ kubectl apply -k base
 kubectl apply -k overlays/staging
 ```
 
-This will apply the base configuration along with the staging-specific patches (e.g., 3 replicas).
+This command applies the base configuration along with the staging-specific patches (e.g., 3 replicas).
 
 ### Apply Production Configuration
 
@@ -33,7 +27,7 @@ This will apply the base configuration along with the staging-specific patches (
 kubectl apply -k overlays/production
 ```
 
-This will apply the base configuration along with the production-specific patches (e.g., 5 replicas).
+This command applies the base configuration along with the production-specific patches (e.g., 5 replicas).
 
 ### View the Kustomized Output
 
