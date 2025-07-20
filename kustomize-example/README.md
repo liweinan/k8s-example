@@ -9,6 +9,14 @@ This project demonstrates a minimal usage of Kustomize to manage Kubernetes conf
     -   `staging`: Overrides the base configuration for the staging environment.
     -   `production`: Overrides the base configuration for the production environment.
 
+## Kustomize vs. `kubectl apply -f`
+
+`kubectl apply -f <file>` is a direct, imperative way to apply configurations, while Kustomize offers a more structured, declarative approach.
+
+-   **Configuration Reuse**: Kustomize excels at reusing a common `base` configuration across multiple environments (`overlays`) without duplicating YAML files. `kubectl apply -f` requires manual copying and modification for each environment.
+-   **Template-Free**: Kustomize works by patching standard YAML files, avoiding the complexity of templating languages like Helm.
+-   **Environment Management**: With Kustomize, the differences between environments are clearly defined in patches, making the configuration easier to manage and understand.
+
 ## Usage
 
 To apply the configurations, you use `kubectl` with the `-k` flag pointing to an overlay directory (`staging` or `production`). Kustomize automatically includes the `base` resources and merges the overlay-specific patches, so you only need to apply the overlay.
