@@ -1,5 +1,5 @@
 # Build the application from source
-FROM docker.io/library/golang:1.18 AS builder
+FROM golang:1.18 AS builder
 
 ENV HTTP_PROXY="http://host.docker.internal:1080"
 ENV HTTPS_PROXY="http://host.docker.internal:1080"

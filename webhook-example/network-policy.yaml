@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-webhook-access
+  namespace: default
+spec:
+  # 将此策略应用于您的 webhook pod
+  podSelector:
+    matchLabels:
+      app: webhook-server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # 允许来自 kube-system 命名空间中任何 Pod 的流量。
+        # 这是让 API Server 能够调用 Webhook 的关键。
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443 # Webhook 服务监听的端口

@@ -1,126 +1,117 @@
-# Kubernetes Webhook Example
+# Kubernetes Validating Webhook Example
 
-This example demonstrates how to create and deploy a simple validating webhook in Kubernetes. The webhook ensures that
-any new pod created in the cluster has the `app` label.
+This project demonstrates a simple validating admission webhook for Kubernetes. The webhook ensures that any new pod created has a specific label (`required-label`).
 
 ## Prerequisites
 
 - A running Kubernetes cluster
 - `kubectl` configured to connect to your cluster
-- Docker installed and running
-- `openssl` for generating certificates
+- Docker (if you need to build the image from source)
 
-## Steps
+## How it Works
 
-1. **Generate TLS Certificates:**
+1.  `main.go`: A simple Go HTTP server that listens for admission review requests from the Kubernetes API server.
+2.  `deployment.yaml`: Deploys the webhook server as a pod in the cluster.
+3.  `service.yaml`: Exposes the webhook server via a ClusterIP service.
+4.  `validating-webhook.yaml`: Registers the webhook with the Kubernetes API, telling it to send pod validation requests to the service.
+5.  `network-policy.yaml`: A network policy that allows the Kubernetes API server (from the `kube-system` namespace) to connect to the webhook pod. This is often required in clusters with network plugins like Cilium or Calico.
 
-   First, generate the necessary TLS certificates for the webhook server. The `generate-certs.sh` script will create a
-   CA and use it to sign a server certificate.
+## Deployment Steps
 
-   ```bash
-   bash generate-certs.sh
-   ```
+### 1. Generate TLS Certificates
 
-2. **Create a Kubernetes Secret:**
+The API server communicates with the webhook over TLS. The following script generates a self-signed certificate authority (CA) and a server certificate for the webhook.
 
-   Create a secret to store the webhook's server certificate and private key.
+```bash
+./generate-certs.sh
+```
 
-   ```bash
-   kubectl create secret tls webhook-certs \
-       --cert=webhook.crt \
-       --key=webhook.key
-   ```
+### 2. Create the TLS Secret
 
-3. **Build and Load the Docker Image:**
+Create a Kubernetes secret to store the server certificate and key. The webhook pod will mount this secret.
 
-   Build the Docker image for the webhook server and load it into your cluster's container runtime (e.g., Minikube's
-   Docker daemon).
+```bash
+sudo k8s kubectl create secret tls webhook-certs \
+    --cert=webhook.crt \
+    --key=webhook.key
+```
 
-   ```bash
-   # For Minikube, point your shell to Minikube's Docker daemon
-   eval $(minikube docker-env)
+### 3. Deploy the Webhook Server and Service
 
-   docker build -t webhook-server:latest .
-   ```
+```bash
+sudo k8s kubectl apply -f deployment.yaml
+sudo k8s kubectl apply -f service.yaml
+```
 
-- https://yeasy.gitbook.io/docker_practice/advanced_network/http_https_proxy
+### 4. Apply the Network Policy
 
-  ```bash
-  anan@think:~/works/k8s-example/webhook-example$ docker build \
-  --build-arg "HTTP_PROXY=http://localhost:1080" \
-  --build-arg "HTTPS_PROXY=http://localhost:1080" \
-  --build-arg "NO_PROXY=localhost,127.0.0.1" \
-  -t webhook-server:lastest .
-  ```
+This policy allows the API server to call the webhook.
 
-4. **Deploy the Webhook:**
+```bash
+sudo k8s kubectl apply -f network-policy.yaml
+```
 
-   Deploy the webhook server and its associated resources to the cluster.
+### 5. Create the Validating Webhook Configuration
 
-   ```bash
-   kubectl apply -f deployment.yaml
-   kubectl apply -f service.yaml
-   ```
+Now, register the webhook with the cluster. We need to inject the CA bundle into the configuration file so the API server can trust our webhook's certificate.
 
-5. **Configure the Validating Webhook:**
+```bash
+CA_BUNDLE=$(cat ca.crt | base64 | tr -d '\n')
+sed "s/CA_BUNDLE_PLACEHOLDER/${CA_BUNDLE}/" validating-webhook.yaml | sudo k8s kubectl apply -f -
+```
 
-   Before applying the `ValidatingWebhookConfiguration`, you need to inject the CA bundle into the
-   `validating-webhook.yaml` file.
+## Testing the Webhook
 
-   ```bash
-   CA_BUNDLE=$(cat ca.crt | base64 | tr -d '\n')
-   sed "s/\${CA_BUNDLE}/$CA_BUNDLE/" validating-webhook.yaml | kubectl apply -f -
-   ```
+### Test Case 1: Create a Pod WITHOUT the required label (Should be rejected)
 
-6. **Test the Webhook:**
+```bash
+# You may need to delete the old pod first: sudo k8s kubectl delete pod test-pod-invalid
+sudo k8s kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-invalid
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+EOF
+```
+You should see an error message from the webhook: `Error from server: error when creating "STDIN": admission webhook "pod-label-validator.example.com" denied the request: Pod must include the label 'required-label'`.
 
-   Now, test the webhook by trying to create pods with and without the required `app` label.
+### Test Case 2: Create a Pod WITH the required label (Should be accepted)
 
-   **a. Pod without the `app` label (should be rejected):**
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: v1
-   kind: Pod
-   metadata:
-     name: test-pod-invalid
-   spec:
-     containers:
-       - name: nginx
-         image: nginx
-   EOF
-   ```
-
-   You should see an error message similar to this:
-   `Error from server: error when creating "STDIN": admission webhook "pod-label-validator.example.com" denied the request: Required label 'app' is missing`
-
-   **b. Pod with the `app` label (should be accepted):**
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: v1
-   kind: Pod
-   metadata:
-     name: test-pod-valid
-     labels:
-       app: my-app
-   spec:
-     containers:
-       - name: nginx
-         image: nginx
-   EOF
-   ```
-
-   This pod should be created successfully.
+```bash
+sudo k8s kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-valid
+  labels:
+    required-label: "true"
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+EOF
+```
+You should see `pod/test-pod-valid created`.
 
 ## Cleanup
 
-To remove the resources created in this example, run the following commands:
+To remove all the resources created by this example, run the following commands:
 
 ```bash
-kubectl delete pod test-pod-valid
-kubectl delete validatingwebhookconfiguration pod-label-validator
-kubectl delete service webhook-server
-kubectl delete deployment webhook-server
-kubectl delete secret webhook-certs
-rm ca.crt ca.key ca.srl webhook.crt webhook.csr webhook.key
+# Delete the test pods
+sudo k8s kubectl delete pod test-pod-invalid --ignore-not-found=true
+sudo k8s kubectl delete pod test-pod-valid --ignore-not-found=true
+
+# Delete the webhook configuration, service, deployment, secret, and network policy
+sudo k8s kubectl delete validatingwebhookconfiguration pod-label-validator.example.com
+sudo k8s kubectl delete service webhook-server
+sudo k8s kubectl delete deployment webhook-server
+sudo k8s kubectl delete secret webhook-certs
+sudo k8s kubectl delete networkpolicy allow-webhook-access
+
+# Delete the generated certificate files
+rm ca.crt ca.key server.csr webhook.crt webhook.key
