@@ -1,6 +1,7 @@
 # Kubernetes Webhook Example
 
-This example demonstrates how to create and deploy a simple validating webhook in Kubernetes. The webhook ensures that any new pod created in the cluster has the `app` label.
+This example demonstrates how to create and deploy a simple validating webhook in Kubernetes. The webhook ensures that
+any new pod created in the cluster has the `app` label.
 
 ## Prerequisites
 
@@ -11,93 +12,106 @@ This example demonstrates how to create and deploy a simple validating webhook i
 
 ## Steps
 
-1.  **Generate TLS Certificates:**
+1. **Generate TLS Certificates:**
 
-    First, generate the necessary TLS certificates for the webhook server. The `generate-certs.sh` script will create a CA and use it to sign a server certificate.
+   First, generate the necessary TLS certificates for the webhook server. The `generate-certs.sh` script will create a
+   CA and use it to sign a server certificate.
 
-    ```bash
-    bash generate-certs.sh
-    ```
+   ```bash
+   bash generate-certs.sh
+   ```
 
-2.  **Create a Kubernetes Secret:**
+2. **Create a Kubernetes Secret:**
 
-    Create a secret to store the webhook's server certificate and private key.
+   Create a secret to store the webhook's server certificate and private key.
 
-    ```bash
-    kubectl create secret tls webhook-certs \
-        --cert=webhook.crt \
-        --key=webhook.key
-    ```
+   ```bash
+   kubectl create secret tls webhook-certs \
+       --cert=webhook.crt \
+       --key=webhook.key
+   ```
 
-3.  **Build and Load the Docker Image:**
+3. **Build and Load the Docker Image:**
 
-    Build the Docker image for the webhook server and load it into your cluster's container runtime (e.g., Minikube's Docker daemon).
+   Build the Docker image for the webhook server and load it into your cluster's container runtime (e.g., Minikube's
+   Docker daemon).
 
-    ```bash
-    # For Minikube, point your shell to Minikube's Docker daemon
-    eval $(minikube docker-env)
+   ```bash
+   # For Minikube, point your shell to Minikube's Docker daemon
+   eval $(minikube docker-env)
 
-    docker build -t webhook-server:latest .
-    ```
+   docker build -t webhook-server:latest .
+   ```
 
-4.  **Deploy the Webhook:**
+- https://yeasy.gitbook.io/docker_practice/advanced_network/http_https_proxy
 
-    Deploy the webhook server and its associated resources to the cluster.
+  ```bash
+  anan@think:~/works/k8s-example/webhook-example$ docker build \
+  --build-arg "HTTP_PROXY=http://localhost:1080" \
+  --build-arg "HTTPS_PROXY=http://localhost:1080" \
+  --build-arg "NO_PROXY=localhost,127.0.0.1" \
+  -t webhook-server:lastest .
+  ```
 
-    ```bash
-    kubectl apply -f deployment.yaml
-    kubectl apply -f service.yaml
-    ```
+4. **Deploy the Webhook:**
 
-5.  **Configure the Validating Webhook:**
+   Deploy the webhook server and its associated resources to the cluster.
 
-    Before applying the `ValidatingWebhookConfiguration`, you need to inject the CA bundle into the `validating-webhook.yaml` file.
+   ```bash
+   kubectl apply -f deployment.yaml
+   kubectl apply -f service.yaml
+   ```
 
-    ```bash
-    CA_BUNDLE=$(cat ca.crt | base64 | tr -d '\n')
-    sed "s/\${CA_BUNDLE}/$CA_BUNDLE/" validating-webhook.yaml | kubectl apply -f -
-    ```
+5. **Configure the Validating Webhook:**
 
-6.  **Test the Webhook:**
+   Before applying the `ValidatingWebhookConfiguration`, you need to inject the CA bundle into the
+   `validating-webhook.yaml` file.
 
-    Now, test the webhook by trying to create pods with and without the required `app` label.
+   ```bash
+   CA_BUNDLE=$(cat ca.crt | base64 | tr -d '\n')
+   sed "s/\${CA_BUNDLE}/$CA_BUNDLE/" validating-webhook.yaml | kubectl apply -f -
+   ```
 
-    **a. Pod without the `app` label (should be rejected):**
+6. **Test the Webhook:**
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: v1
-    kind: Pod
-    metadata:
-      name: test-pod-invalid
-    spec:
-      containers:
-        - name: nginx
-          image: nginx
-    EOF
-    ```
+   Now, test the webhook by trying to create pods with and without the required `app` label.
 
-    You should see an error message similar to this:
-    `Error from server: error when creating "STDIN": admission webhook "pod-label-validator.example.com" denied the request: Required label 'app' is missing`
+   **a. Pod without the `app` label (should be rejected):**
 
-    **b. Pod with the `app` label (should be accepted):**
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: test-pod-invalid
+   spec:
+     containers:
+       - name: nginx
+         image: nginx
+   EOF
+   ```
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: v1
-    kind: Pod
-    metadata:
-      name: test-pod-valid
-      labels:
-        app: my-app
-    spec:
-      containers:
-        - name: nginx
-          image: nginx
-    EOF
-    ```
+   You should see an error message similar to this:
+   `Error from server: error when creating "STDIN": admission webhook "pod-label-validator.example.com" denied the request: Required label 'app' is missing`
 
-    This pod should be created successfully.
+   **b. Pod with the `app` label (should be accepted):**
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: test-pod-valid
+     labels:
+       app: my-app
+   spec:
+     containers:
+       - name: nginx
+         image: nginx
+   EOF
+   ```
+
+   This pod should be created successfully.
 
 ## Cleanup
 
