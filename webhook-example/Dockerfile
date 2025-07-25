@@ -1,18 +1,14 @@
 # Build the application from source
 FROM golang:1.18 AS builder
-
-ENV HTTP_PROXY="http://host.docker.internal:1080"
-ENV HTTPS_PROXY="http://host.docker.internal:1080"
-ENV NO_PROXY="localhost,127.0.0.1,host.docker.internal"
-
 WORKDIR /app
+
 COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
+RUN cat /etc/hosts 
+RUN GOPROXY="direct" http_proxy=http://192.168.0.123:1080 https_proxy=http://192.168.0.123:1080 go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o webhook .
 
 # Create a minimal container image
-FROM docker.io/library/alpine:latest
+FROM alpine:latest
 WORKDIR /root/
 COPY --from=builder /app/webhook .
 CMD ["./webhook"]
