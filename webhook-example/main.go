@@ -8,7 +8,7 @@ import (
 
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -26,8 +26,8 @@ var (
 		metav1.NamespaceSystem,
 		metav1.NamespacePublic,
 	}
-	requiredLabels = []string{
-		"app",
+	requiredAnnotations = []string{
+		"nginx.ingress.kubernetes.io/rewrite-target",
 	}
 )
 
@@ -97,8 +97,8 @@ func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
 
 func (whsvr *WebhookServer) validate(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	req := ar.Request
-	var pod corev1.Pod
-	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
+	var ingress networkingv1.Ingress
+	if err := json.Unmarshal(req.Object.Raw, &ingress); err != nil {
 		klog.Errorf("Could not unmarshal raw object: %v", err)
 		return &v1beta1.AdmissionResponse{
 			Result: &metav1.Status{
@@ -108,21 +108,21 @@ func (whsvr *WebhookServer) validate(ar *v1beta1.AdmissionReview) *v1beta1.Admis
 	}
 
 	klog.Infof("AdmissionReview for Kind=%v, Namespace=%v Name=%v (%v) UID=%v patchOperation=%v UserInfo=%v",
-		req.Kind, req.Namespace, req.Name, pod.Name, req.UID, req.Operation, req.UserInfo)
+		req.Kind, req.Namespace, req.Name, ingress.Name, req.UID, req.Operation, req.UserInfo)
 
 	// determine whether to perform validation
-	if !validationRequired(ignoredNamespaces, &pod.ObjectMeta) {
-		klog.Infof("Skipping validation for %s/%s due to policy check", pod.Namespace, pod.Name)
+	if !validationRequired(ignoredNamespaces, &ingress.ObjectMeta) {
+		klog.Infof("Skipping validation for %s/%s due to policy check", ingress.Namespace, ingress.Name)
 		return &v1beta1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
 
-	for _, label := range requiredLabels {
-		if _, ok := pod.Labels[label]; !ok {
+	for _, annotation := range requiredAnnotations {
+		if _, ok := ingress.Annotations[annotation]; !ok {
 			return &v1beta1.AdmissionResponse{
 				Result: &metav1.Status{
-					Message: fmt.Sprintf("Required label '%s' is missing", label),
+					Message: fmt.Sprintf("Required annotation '%s' is missing", annotation),
 				},
 			}
 		}
@@ -146,7 +146,7 @@ func validationRequired(ignoredList []string, metadata *metav1.ObjectMeta) bool 
 func main() {
 	// Add to scheme
 	addToScheme(admissionregistrationv1beta1.AddToScheme)
-	addToScheme(corev1.AddToScheme)
+	addToScheme(networkingv1.AddToScheme)
 
 	params := WhSvrParameters{
 		port:     8443,

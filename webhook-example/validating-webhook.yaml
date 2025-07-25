@@ -5,10 +5,10 @@ metadata:
 webhooks:
   - name: pod-label-validator.example.com
     rules:
-      - apiGroups: [""]
+      - apiGroups: ["networking.k8s.io"]
         apiVersions: ["v1"]
-        operations: ["CREATE"]
-        resources: ["pods"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["ingresses"]
         scope: "*"
     clientConfig:
       service:
