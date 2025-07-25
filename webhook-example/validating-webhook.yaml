@@ -13,7 +13,7 @@ webhooks:
     clientConfig:
       service:
         name: webhook-server
-        namespace: default
+        namespace: webhook-system
         path: "/validate"
       caBundle: ${CA_BUNDLE}
     admissionReviewVersions: ["v1", "v1beta1"]
