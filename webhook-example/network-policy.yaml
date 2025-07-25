@@ -12,14 +12,11 @@ spec:
     - Ingress
   ingress:
     - from:
-        # 允许来自带有 "component: kube-apiserver" 标签的 Pod 的流量，
-        # 这些通常是 kube-apiserver Pod。
+        # Allow traffic from any pod with the "component: kube-apiserver" label
+        # from any namespace.
         - podSelector:
             matchLabels:
               component: kube-apiserver
-          namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
       ports:
         - protocol: TCP
           port: 443 # Webhook 服务监听的端口
