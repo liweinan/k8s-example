@@ -25,9 +25,9 @@ type Profile struct {
 // User is the main struct for our example.
 // It demonstrates embedding structs for both inlining and standard nesting.
 type User struct {
-	// By embedding Metadata with the ",inline" tag, its fields (ID, CreationTimestamp)
-	// will appear at the top level of the User JSON object.
-	Metadata
+	// INLINE EXAMPLE: By embedding Metadata with the `json:",inline"` tag, its fields (ID, CreationTimestamp)
+	// are "promoted" to the top level of the User JSON object.
+	Metadata `json:",inline"`
 
 	// Username is a regular field of the User struct.
 	Username string `json:"username"`
@@ -35,8 +35,8 @@ type User struct {
 	// IsActive demonstrates a boolean with a custom JSON key name.
 	IsActive bool `json:"isActive"`
 
-	// Profile is a nested struct. It will be represented as a nested JSON object.
-	// The "profile" key comes from the field name.
+	// NON-INLINE (NESTED) EXAMPLE: Profile is a standard nested struct.
+	// It will be represented as a nested JSON object under the "profile" key.
 	Profile Profile `json:"profile"`
 
 	// Tags demonstrates a slice of strings.

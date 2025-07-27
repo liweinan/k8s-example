@@ -33,34 +33,39 @@ func TestMarshalling(t *testing.T) {
 	}
 
 	// We unmarshal the result into a map to check the fields.
-	// This avoids issues with key ordering in the JSON string.
+	// This is a robust way to test the JSON structure without depending on key order.
 	var resultMap map[string]interface{}
 	if err := json.Unmarshal(jsonData, &resultMap); err != nil {
 		t.Fatalf("Failed to unmarshal result map: %v", err)
 	}
 
-	// Verify top-level fields from the inlined struct
-	if id := resultMap["id"].(float64); id != 123 {
-		t.Errorf("Expected id to be 123, got %v", id)
+	// --- VERIFY INLINE BEHAVIOR ---
+	// Check that the fields from the inlined Metadata struct appear at the top level.
+	if id, ok := resultMap["id"].(float64); !ok || id != 123 {
+		t.Errorf("Expected top-level 'id' to be 123, got %v", resultMap["id"])
 	}
-	if ts := resultMap["creationTimestamp"].(string); ts != "2023-01-01T12:00:00Z" {
-		t.Errorf("Expected creationTimestamp to be '2023-01-01T12:00:00Z', got '%s'", ts)
+	if ts, ok := resultMap["creationTimestamp"].(string); !ok || ts != "2023-01-01T12:00:00Z" {
+		t.Errorf("Expected top-level 'creationTimestamp' to be '2023-01-01T12:00:00Z', got '%s'", ts)
 	}
 
-	// Verify other fields
+	// --- VERIFY OTHER FIELDS ---
 	if username := resultMap["username"].(string); username != "testuser" {
 		t.Errorf("Expected username to be 'testuser', got '%s'", username)
 	}
 
-	// Verify that the password field is not present
+	// Verify that the password field is not present due to `json:"-"`
 	if _, exists := resultMap["password"]; exists {
 		t.Error("Expected password field to be omitted, but it exists")
 	}
 
-	// Verify the nested profile object
-	profileMap := resultMap["profile"].(map[string]interface{})
-	if website := profileMap["website"].(string); website != "https://test.com" {
-		t.Errorf("Expected profile website to be 'https://test.com', got '%s'", website)
+	// --- VERIFY NON-INLINE (NESTED) BEHAVIOR ---
+	// Check that the Profile struct is a nested object.
+	profileMap, ok := resultMap["profile"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected 'profile' to be a nested object")
+	}
+	if website, ok := profileMap["website"].(string); !ok || website != "https://test.com" {
+		t.Errorf("Expected profile website to be 'https://test.com', got '%s'", profileMap["website"])
 	}
 }
 
@@ -77,6 +82,9 @@ func TestUnmarshalling(t *testing.T) {
 	  "tags": ["a", "b"]
 	}`
 
+	// The JSON string has "id" and "creationTimestamp" at the top level.
+	// The unmarshaller should correctly place them into the embedded `User.Metadata` struct
+	// because of the `json:",inline"` tag.
 	var user User
 	err := json.Unmarshal([]byte(jsonString), &user)
 	if err != nil {
