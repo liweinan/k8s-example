@@ -16,6 +16,14 @@ This project provides a clear, commented example of how to handle JSON serializa
     *   `json:"-"`: Omits a field from the JSON output entirely.
 *   **Unit Testing**: Basic tests for the marshalling and unmarshalling logic using Go's built-in `testing` package.
 
+## Field Precedence and Overriding
+
+This example also demonstrates how Go's `encoding/json` package handles name collisions between fields in an outer struct and an inlined inner struct.
+
+**The Rule**: The field from the **outer-most struct wins**.
+
+In `main.go`, both `User` and the inlined `Metadata` have a field that maps to the `"id"` JSON key. When marshalling, the value from `User.ID` is used for the top-level `"id"`, overriding the value from `Metadata.ID`. When unmarshalling, the top-level `"id"` from the JSON is placed into the `User.ID` field.
+
 ## How to Run
 
 ### Prerequisites

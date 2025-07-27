@@ -14,12 +14,14 @@ func TestMarshalling(t *testing.T) {
 
 	user := User{
 		Metadata: Metadata{
-			ID:                123,
+			ID:                123, // This will be overridden
 			CreationTimestamp: fixedTime,
 		},
+		ID:       999, // This is the overriding field
 		Username: "testuser",
 		IsActive: true,
 		Profile: Profile{
+			ID:      456,
 			Website: "https://test.com",
 		},
 		Tags:     []string{"test", "go"},
@@ -39,10 +41,10 @@ func TestMarshalling(t *testing.T) {
 		t.Fatalf("Failed to unmarshal result map: %v", err)
 	}
 
-	// --- VERIFY INLINE BEHAVIOR ---
-	// Check that the fields from the inlined Metadata struct appear at the top level.
-	if id, ok := resultMap["id"].(float64); !ok || id != 123 {
-		t.Errorf("Expected top-level 'id' to be 123, got %v", resultMap["id"])
+	// --- VERIFY FIELD OVERRIDE ---
+	// Check that the top-level 'id' is from User.ID (999), not Metadata.ID (123).
+	if id, ok := resultMap["id"].(float64); !ok || id != 999 {
+		t.Errorf("Expected top-level 'id' to be 999 due to override, got %v", resultMap["id"])
 	}
 	if ts, ok := resultMap["creationTimestamp"].(string); !ok || ts != "2023-01-01T12:00:00Z" {
 		t.Errorf("Expected top-level 'creationTimestamp' to be '2023-01-01T12:00:00Z', got '%s'", ts)
@@ -59,10 +61,13 @@ func TestMarshalling(t *testing.T) {
 	}
 
 	// --- VERIFY NON-INLINE (NESTED) BEHAVIOR ---
-	// Check that the Profile struct is a nested object.
+	// Check that the Profile struct is a nested object with its own ID.
 	profileMap, ok := resultMap["profile"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("Expected 'profile' to be a nested object")
+	}
+	if id, ok := profileMap["id"].(float64); !ok || id != 456 {
+		t.Errorf("Expected profile id to be 456, got %v", profileMap["id"])
 	}
 	if website, ok := profileMap["website"].(string); !ok || website != "https://test.com" {
 		t.Errorf("Expected profile website to be 'https://test.com', got '%s'", profileMap["website"])
@@ -72,11 +77,12 @@ func TestMarshalling(t *testing.T) {
 // TestUnmarshalling verifies that a JSON string is correctly unmarshalled into the User struct.
 func TestUnmarshalling(t *testing.T) {
 	jsonString := `{
-	  "id": 999,
+	  "id": 888,
 	  "creationTimestamp": "2024-01-01T00:00:00Z",
 	  "username": "testunmarshal",
 	  "isActive": true,
 	  "profile": {
+		"id": 777,
 		"location": "Test City"
 	  },
 	  "tags": ["a", "b"]
@@ -94,13 +100,17 @@ func TestUnmarshalling(t *testing.T) {
 	// Expected struct after unmarshalling
 	expectedTime, _ := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
 	expectedUser := User{
+		// The top-level "id" from the JSON goes into the outer User.ID field.
+		// The inlined Metadata.ID is left as its zero value.
 		Metadata: Metadata{
-			ID:                999,
+			ID:                0,
 			CreationTimestamp: expectedTime,
 		},
+		ID:       888,
 		Username: "testunmarshal",
 		IsActive: true,
 		Profile: Profile{
+			ID:       777,
 			Location: "Test City",
 		},
 		Tags: []string{"a", "b"},

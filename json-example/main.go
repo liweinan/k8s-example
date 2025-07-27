@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 )
 
@@ -18,6 +19,8 @@ type Metadata struct {
 // Profile represents a standard nested object.
 // It will appear as a JSON object under the "profile" key.
 type Profile struct {
+	// This ID does not conflict with the top-level ID because it's nested.
+	ID       int    `json:"id,omitempty"`
 	Website  string `json:"website,omitempty"`
 	Location string `json:"location,omitempty"`
 }
@@ -28,6 +31,10 @@ type User struct {
 	// INLINE EXAMPLE: By embedding Metadata with the `json:",inline"` tag, its fields (ID, CreationTimestamp)
 	// are "promoted" to the top level of the User JSON object.
 	Metadata `json:",inline"`
+
+	// FIELD OVERRIDE: This field also maps to the `id` key. Because it is in the outer struct,
+	// it takes precedence over the `Metadata.ID` field during marshalling.
+	ID int `json:"id"`
 
 	// Username is a regular field of the User struct.
 	Username string `json:"username"`
@@ -54,12 +61,14 @@ func main() {
 	// Create an instance of the User struct with some data.
 	userToMarshal := User{
 		Metadata: Metadata{
-			ID:                123,
+			ID:                123, // This ID will be overridden by User.ID during marshalling.
 			CreationTimestamp: time.Now(),
 		},
+		ID:       999, // This is the top-level ID that will be used.
 		Username: "johndoe",
 		IsActive: true,
 		Profile: Profile{
+			ID:       456, // This is the nested profile ID.
 			Website:  "https://example.com",
 			Location: "New York",
 		},
@@ -87,11 +96,12 @@ func main() {
 
 	// A raw JSON string that we want to parse.
 	jsonString := `{
-	  "id": 456,
+	  "id": 888,
 	  "creationTimestamp": "2023-10-27T10:00:00Z",
 	  "username": "janedoe",
 	  "isActive": false,
 	  "profile": {
+		"id": 777,
 		"location": "London"
 	  },
 	  "tags": ["developer", "testing"]
@@ -111,4 +121,51 @@ func main() {
 	// The `%+v` format verb prints the struct with field names.
 	fmt.Printf("Unmarshalled struct: %+v\n", unmarshalledUser)
 	fmt.Printf("Username: %s, Location: %s\n", unmarshalledUser.Username, unmarshalledUser.Profile.Location)
+	fmt.Println()
+
+	// --- 3. Reflection: How It Works ---
+	fmt.Println("--- Reflection: How Struct Tags Are Read ---")
+	// We pass a pointer to the User struct to our inspection function.
+	inspectStruct(&User{})
+}
+
+// inspectStruct uses reflection to loop through the fields of any given struct
+// and prints out its metadata, including the json tag. This is a simplified
+// demonstration of what the `encoding/json` package does internally.
+func inspectStruct(s interface{}) {
+	// Get the reflect.Type of the interface.
+	val := reflect.TypeOf(s)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	// Check if the type is actually a struct.
+	if val.Kind() != reflect.Struct {
+		fmt.Println("Error: Provided interface is not a struct.")
+		return
+	}
+
+	fmt.Printf("Inspecting struct: %s\n", val.Name())
+	fmt.Println("------------------------------------")
+
+	// Loop through all the fields of the struct.
+	for i := 0; i < val.NumField(); i++ {
+		// Get the field's metadata (reflect.StructField).
+		field := val.Field(i)
+
+		// Get the json tag from the field's Tag property.
+		jsonTag := field.Tag.Get("json")
+
+		// For embedded structs, the field name is the type name.
+		fieldName := field.Name
+		if field.Anonymous {
+			fieldName = field.Type.Name()
+		}
+
+		fmt.Printf("Field Name: %-15s | Type: %-10s | JSON Tag: '%s'\n",
+			fieldName,
+			field.Type.Name(),
+			jsonTag,
+		)
+	}
 }
