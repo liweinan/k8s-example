@@ -1,0 +1,754 @@
+anan@think:~$ sudo k8s  kubectl describe pod -n kube-system
+Name:                 cilium-bpfdw
+Namespace:            kube-system
+Priority:             2000001000
+Priority Class Name:  system-node-critical
+Service Account:      cilium
+Node:                 think/192.168.0.123
+Start Time:           Tue, 09 Sep 2025 00:55:12 +0800
+Labels:               app.kubernetes.io/name=cilium-agent
+                      app.kubernetes.io/part-of=cilium
+                      controller-revision-hash=5d6685d469
+                      k8s-app=cilium
+                      pod-template-generation=2
+Annotations:          kubectl.kubernetes.io/restartedAt: 2025-09-09T00:54:16+08:00
+Status:               Running
+IP:                   192.168.0.123
+IPs:
+  IP:           192.168.0.123
+Controlled By:  DaemonSet/cilium
+Init Containers:
+  config:
+    Container ID:  containerd://4652fa376dedd4765b730a4def0f7f627bc0d58691385f15f2712ff38202c6c2
+    Image:         ghcr.io/canonical/cilium:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium@sha256:664d5b5c9c0a4f0146d04a5513e1a488e8f12a62628af484fb1e1f211e54accc
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      cilium-dbg
+      build-config
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 09 Sep 2025 00:55:12 +0800
+      Finished:     Tue, 09 Sep 2025 00:55:12 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      K8S_NODE_NAME:             (v1:spec.nodeName)
+      CILIUM_K8S_NAMESPACE:     kube-system (v1:metadata.namespace)
+      KUBERNETES_SERVICE_HOST:  127.0.0.1
+      KUBERNETES_SERVICE_PORT:  6443
+    Mounts:
+      /tmp from tmp (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qb9sw (ro)
+  mount-cgroup:
+    Container ID:  containerd://8ab7a96d3180b2b7f824626cc219d5a9cb6906823618aa6e319f3224fbaca9a5
+    Image:         ghcr.io/canonical/cilium:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium@sha256:664d5b5c9c0a4f0146d04a5513e1a488e8f12a62628af484fb1e1f211e54accc
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -ec
+      cp /usr/bin/cilium-mount /hostbin/cilium-mount;
+      nsenter --cgroup=/hostproc/1/ns/cgroup --mount=/hostproc/1/ns/mnt "${BIN_PATH}/cilium-mount" $CGROUP_ROOT;
+      rm /hostbin/cilium-mount
+
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 09 Sep 2025 00:55:13 +0800
+      Finished:     Tue, 09 Sep 2025 00:55:13 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      CGROUP_ROOT:  /run/cilium/cgroupv2
+      BIN_PATH:     /opt/cni/bin
+    Mounts:
+      /hostbin from cni-path (rw)
+      /hostproc from hostproc (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qb9sw (ro)
+  apply-sysctl-overwrites:
+    Container ID:  containerd://9e55652b454a991169f571b437bd8993d15f04a3cddda6d8781b61828a518d1f
+    Image:         ghcr.io/canonical/cilium:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium@sha256:664d5b5c9c0a4f0146d04a5513e1a488e8f12a62628af484fb1e1f211e54accc
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -ec
+      cp /usr/bin/cilium-sysctlfix /hostbin/cilium-sysctlfix;
+      nsenter --mount=/hostproc/1/ns/mnt "${BIN_PATH}/cilium-sysctlfix";
+      rm /hostbin/cilium-sysctlfix
+
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 09 Sep 2025 00:55:14 +0800
+      Finished:     Tue, 09 Sep 2025 00:55:14 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      BIN_PATH:  /opt/cni/bin
+    Mounts:
+      /hostbin from cni-path (rw)
+      /hostproc from hostproc (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qb9sw (ro)
+  mount-bpf-fs:
+    Container ID:  containerd://40514ef106bc8beb1fe117016730f65e256436247d6fb997b76a3e92c5995e34
+    Image:         ghcr.io/canonical/cilium:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium@sha256:664d5b5c9c0a4f0146d04a5513e1a488e8f12a62628af484fb1e1f211e54accc
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /bin/bash
+      -c
+      --
+    Args:
+      mount | grep "/sys/fs/bpf type bpf" || mount -t bpf bpf /sys/fs/bpf
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 09 Sep 2025 00:55:15 +0800
+      Finished:     Tue, 09 Sep 2025 00:55:15 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /sys/fs/bpf from bpf-maps (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qb9sw (ro)
+  clean-cilium-state:
+    Container ID:  containerd://910d19c99752eb0fb2a2dcfa9f46470d234d9442f5d4d13748cc5b9e2a46f571
+    Image:         ghcr.io/canonical/cilium:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium@sha256:664d5b5c9c0a4f0146d04a5513e1a488e8f12a62628af484fb1e1f211e54accc
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /init-container.sh
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 09 Sep 2025 00:55:16 +0800
+      Finished:     Tue, 09 Sep 2025 00:55:16 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      CILIUM_ALL_STATE:           <set to the key 'clean-cilium-state' of config map 'cilium-config'>         Optional: true
+      CILIUM_BPF_STATE:           <set to the key 'clean-cilium-bpf-state' of config map 'cilium-config'>     Optional: true
+      WRITE_CNI_CONF_WHEN_READY:  <set to the key 'write-cni-conf-when-ready' of config map 'cilium-config'>  Optional: true
+      KUBERNETES_SERVICE_HOST:    127.0.0.1
+      KUBERNETES_SERVICE_PORT:    6443
+    Mounts:
+      /run/cilium/cgroupv2 from cilium-cgroup (rw)
+      /sys/fs/bpf from bpf-maps (rw)
+      /var/run/cilium from cilium-run (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qb9sw (ro)
+  install-cni-binaries:
+    Container ID:  containerd://d495c26d0c59611bf79facdf81c1b0d0799d1c71a9799c62e98c34dc31109db1
+    Image:         ghcr.io/canonical/cilium:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium@sha256:664d5b5c9c0a4f0146d04a5513e1a488e8f12a62628af484fb1e1f211e54accc
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /install-plugin.sh
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 09 Sep 2025 00:55:17 +0800
+      Finished:     Tue, 09 Sep 2025 00:55:17 +0800
+    Ready:          True
+    Restart Count:  0
+    Requests:
+      cpu:        100m
+      memory:     10Mi
+    Environment:  <none>
+    Mounts:
+      /host/opt/cni/bin from cni-path (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qb9sw (ro)
+Containers:
+  cilium-agent:
+    Container ID:  containerd://bd61908b7e24f81c20e21e43673062f665f997ac113a290c7c92aab53d58f41a
+    Image:         ghcr.io/canonical/cilium:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium@sha256:664d5b5c9c0a4f0146d04a5513e1a488e8f12a62628af484fb1e1f211e54accc
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      cilium-agent
+    Args:
+      --config-dir=/tmp/cilium/config-map
+    State:          Running
+      Started:      Tue, 09 Sep 2025 00:55:18 +0800
+    Ready:          True
+    Restart Count:  0
+    Liveness:       http-get http://127.0.0.1:9879/healthz delay=0s timeout=5s period=30s #success=1 #failure=10
+    Readiness:      http-get http://127.0.0.1:9879/healthz delay=0s timeout=5s period=30s #success=1 #failure=3
+    Startup:        http-get http://127.0.0.1:9879/healthz delay=5s timeout=1s period=2s #success=1 #failure=105
+    Environment:
+      K8S_NODE_NAME:               (v1:spec.nodeName)
+      CILIUM_K8S_NAMESPACE:       kube-system (v1:metadata.namespace)
+      CILIUM_CLUSTERMESH_CONFIG:  /var/lib/cilium/clustermesh/
+      GOMEMLIMIT:                 node allocatable (limits.memory)
+      KUBERNETES_SERVICE_HOST:    127.0.0.1
+      KUBERNETES_SERVICE_PORT:    6443
+    Mounts:
+      /host/etc/cni/net.d from etc-cni-netd (rw)
+      /host/proc/sys/kernel from host-proc-sys-kernel (rw)
+      /host/proc/sys/net from host-proc-sys-net (rw)
+      /lib/modules from lib-modules (ro)
+      /run/xtables.lock from xtables-lock (rw)
+      /sys/fs/bpf from bpf-maps (rw)
+      /tmp from tmp (rw)
+      /var/lib/cilium/clustermesh from clustermesh-secrets (ro)
+      /var/lib/cilium/tls/hubble from hubble-tls (ro)
+      /var/run/cilium from cilium-run (rw)
+      /var/run/cilium/netns from cilium-netns (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qb9sw (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       True
+  ContainersReady             True
+  PodScheduled                True
+Volumes:
+  tmp:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+    SizeLimit:  <unset>
+  cilium-run:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/run/cilium
+    HostPathType:  DirectoryOrCreate
+  cilium-netns:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/run/netns
+    HostPathType:  DirectoryOrCreate
+  bpf-maps:
+    Type:          HostPath (bare host directory volume)
+    Path:          /sys/fs/bpf
+    HostPathType:  DirectoryOrCreate
+  hostproc:
+    Type:          HostPath (bare host directory volume)
+    Path:          /proc
+    HostPathType:  Directory
+  cilium-cgroup:
+    Type:          HostPath (bare host directory volume)
+    Path:          /run/cilium/cgroupv2
+    HostPathType:  DirectoryOrCreate
+  cni-path:
+    Type:          HostPath (bare host directory volume)
+    Path:          /opt/cni/bin
+    HostPathType:  DirectoryOrCreate
+  etc-cni-netd:
+    Type:          HostPath (bare host directory volume)
+    Path:          /etc/cni/net.d
+    HostPathType:  DirectoryOrCreate
+  lib-modules:
+    Type:          HostPath (bare host directory volume)
+    Path:          /lib/modules
+    HostPathType:
+  xtables-lock:
+    Type:          HostPath (bare host directory volume)
+    Path:          /run/xtables.lock
+    HostPathType:  FileOrCreate
+  clustermesh-secrets:
+    Type:        Projected (a volume that contains injected data from multiple sources)
+    SecretName:  cilium-clustermesh
+    Optional:    true
+    SecretName:  clustermesh-apiserver-remote-cert
+    Optional:    true
+    SecretName:  clustermesh-apiserver-local-cert
+    Optional:    true
+  host-proc-sys-net:
+    Type:          HostPath (bare host directory volume)
+    Path:          /proc/sys/net
+    HostPathType:  Directory
+  host-proc-sys-kernel:
+    Type:          HostPath (bare host directory volume)
+    Path:          /proc/sys/kernel
+    HostPathType:  Directory
+  hubble-tls:
+    Type:        Projected (a volume that contains injected data from multiple sources)
+    SecretName:  hubble-server-certs
+    Optional:    true
+  kube-api-access-qb9sw:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              kubernetes.io/os=linux
+Tolerations:                 op=Exists
+                             node.kubernetes.io/disk-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/memory-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/network-unavailable:NoSchedule op=Exists
+                             node.kubernetes.io/not-ready:NoExecute op=Exists
+                             node.kubernetes.io/pid-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/unreachable:NoExecute op=Exists
+                             node.kubernetes.io/unschedulable:NoSchedule op=Exists
+Events:                      <none>
+
+
+Name:                 cilium-operator-86b9fc68d7-mk6zl
+Namespace:            kube-system
+Priority:             2000000000
+Priority Class Name:  system-cluster-critical
+Service Account:      cilium-operator
+Node:                 think/192.168.0.123
+Start Time:           Tue, 09 Sep 2025 00:55:26 +0800
+Labels:               app.kubernetes.io/name=cilium-operator
+                      app.kubernetes.io/part-of=cilium
+                      io.cilium/app=operator
+                      name=cilium-operator
+                      pod-template-hash=86b9fc68d7
+Annotations:          kubectl.kubernetes.io/restartedAt: 2025-09-09T00:54:16+08:00
+                      prometheus.io/port: 9963
+                      prometheus.io/scrape: true
+Status:               Running
+IP:                   192.168.0.123
+IPs:
+  IP:           192.168.0.123
+Controlled By:  ReplicaSet/cilium-operator-86b9fc68d7
+Containers:
+  cilium-operator:
+    Container ID:  containerd://abe0adfab8c981b753acba87812e06d9b4673e532538226b99f4c35ab2ce8c67
+    Image:         ghcr.io/canonical/cilium-operator-generic:1.17.1-ck3
+    Image ID:      ghcr.io/canonical/cilium-operator-generic@sha256:2dce754c361cc1003dc0c0091587c9e078b1abb217eb8999037aa73dfa1ae4c8
+    Port:          9963/TCP (prometheus)
+    Host Port:     9963/TCP (prometheus)
+    Command:
+      cilium-operator-generic
+    Args:
+      --config-dir=/tmp/cilium/config-map
+      --debug=$(CILIUM_DEBUG)
+    State:          Running
+      Started:      Tue, 09 Sep 2025 00:55:26 +0800
+    Ready:          True
+    Restart Count:  0
+    Liveness:       http-get http://127.0.0.1:9234/healthz delay=60s timeout=3s period=10s #success=1 #failure=3
+    Readiness:      http-get http://127.0.0.1:9234/healthz delay=0s timeout=3s period=5s #success=1 #failure=5
+    Environment:
+      K8S_NODE_NAME:             (v1:spec.nodeName)
+      CILIUM_K8S_NAMESPACE:     kube-system (v1:metadata.namespace)
+      CILIUM_DEBUG:             <set to the key 'debug' of config map 'cilium-config'>  Optional: true
+      KUBERNETES_SERVICE_HOST:  127.0.0.1
+      KUBERNETES_SERVICE_PORT:  6443
+    Mounts:
+      /tmp/cilium/config-map from cilium-config-path (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-gwx6m (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       True
+  ContainersReady             True
+  PodScheduled                True
+Volumes:
+  cilium-config-path:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      cilium-config
+    Optional:  false
+  kube-api-access-gwx6m:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              kubernetes.io/os=linux
+Tolerations:                 op=Exists
+Events:                      <none>
+
+
+Name:                 ck-storage-rawfile-csi-controller-0
+Namespace:            kube-system
+Priority:             2000000000
+Priority Class Name:  system-cluster-critical
+Service Account:      ck-storage-rawfile-csi-driver
+Node:                 think/192.168.0.123
+Start Time:           Tue, 09 Sep 2025 01:59:37 +0800
+Labels:               app.kubernetes.io/instance=ck-storage
+                      app.kubernetes.io/name=rawfile-csi
+                      apps.kubernetes.io/pod-index=0
+                      component=controller
+                      controller-revision-hash=ck-storage-rawfile-csi-controller-6d8d8d6c9d
+                      statefulset.kubernetes.io/pod-name=ck-storage-rawfile-csi-controller-0
+Annotations:          <none>
+Status:               Running
+IP:                   10.1.0.53
+IPs:
+  IP:           10.1.0.53
+Controlled By:  StatefulSet/ck-storage-rawfile-csi-controller
+Containers:
+  csi-driver:
+    Container ID:  containerd://8633bcfba276fac9a42ba4084b38262f24523f14d13196a739fb67204cb560e3
+    Image:         ghcr.io/canonical/rawfile-localpv:0.8.2-ck3
+    Image ID:      ghcr.io/canonical/rawfile-localpv@sha256:6de40c4fbffe1953d9b062aba62b3d5350b999ec1a71aa4a726b693fba5a9db5
+    Port:          9808/TCP (csi-probe)
+    Host Port:     0/TCP (csi-probe)
+    Args:
+      --args
+      rawfile
+      csi-driver
+      --disable-metrics
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:59:38 +0800
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     1
+      memory:  100Mi
+    Requests:
+      cpu:     10m
+      memory:  100Mi
+    Environment:
+      PROVISIONER_NAME:  rawfile.csi.openebs.io
+      CSI_ENDPOINT:      unix:///csi/csi.sock
+      IMAGE_REPOSITORY:  ghcr.io/canonical/rawfile-localpv
+    Mounts:
+      /csi from socket-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-d9rrl (ro)
+  external-resizer:
+    Container ID:  containerd://f315ebcbbed06418dce248307a9aae4510442b0da64df4894bf1b14aa3c98ded
+    Image:         ghcr.io/canonical/csi-resizer:1.11.2-ck1
+    Image ID:      ghcr.io/canonical/csi-resizer@sha256:1158380af3dcd3e80d0fe2791cec3e595aa6b083fb8a811faabeb4fe2e9776fa
+    Port:          <none>
+    Host Port:     <none>
+    Args:
+      --csi-address=$(ADDRESS)
+      --handle-volume-inuse-error=false
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:59:38 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      ADDRESS:  /csi/csi.sock
+    Mounts:
+      /csi from socket-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-d9rrl (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       True
+  ContainersReady             True
+  PodScheduled                True
+Volumes:
+  socket-dir:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+    SizeLimit:  <unset>
+  kube-api-access-d9rrl:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node-role.kubernetes.io/control-plane=true:NoSchedule
+                             node-role.kubernetes.io/master=true:NoSchedule
+                             node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
+
+
+Name:                 ck-storage-rawfile-csi-node-6w4gq
+Namespace:            kube-system
+Priority:             2000001000
+Priority Class Name:  system-node-critical
+Service Account:      ck-storage-rawfile-csi-driver
+Node:                 think/192.168.0.123
+Start Time:           Tue, 09 Sep 2025 01:59:47 +0800
+Labels:               app.kubernetes.io/instance=ck-storage
+                      app.kubernetes.io/name=rawfile-csi
+                      component=node
+                      controller-revision-hash=6db6bfff86
+                      pod-template-generation=1
+Annotations:          <none>
+Status:               Running
+IP:                   10.1.0.247
+IPs:
+  IP:           10.1.0.247
+Controlled By:  DaemonSet/ck-storage-rawfile-csi-node
+Containers:
+  csi-driver:
+    Container ID:   containerd://f150b7ecc9824711fd5e40330586e8b5fadd465e16b181d771e9c61a25755ba4
+    Image:          ghcr.io/canonical/rawfile-localpv:0.8.2-ck3
+    Image ID:       ghcr.io/canonical/rawfile-localpv@sha256:6de40c4fbffe1953d9b062aba62b3d5350b999ec1a71aa4a726b693fba5a9db5
+    Ports:          9100/TCP (metrics), 9808/TCP (csi-probe)
+    Host Ports:     0/TCP (metrics), 0/TCP (csi-probe)
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:59:48 +0800
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     1
+      memory:  100Mi
+    Requests:
+      cpu:     10m
+      memory:  100Mi
+    Environment:
+      PROVISIONER_NAME:  rawfile.csi.openebs.io
+      CSI_ENDPOINT:      unix:///csi/csi.sock
+      IMAGE_REPOSITORY:  ghcr.io/canonical/rawfile-localpv
+      NODE_ID:            (v1:spec.nodeName)
+    Mounts:
+      /csi from socket-dir (rw)
+      /data from data-dir (rw)
+      /var/lib/kubelet from mountpoint-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-6gp2k (ro)
+  node-driver-registrar:
+    Container ID:  containerd://3a8709597ed315e414d5f9d79997bfe6b37987879630f2521669364d4f0b37e8
+    Image:         ghcr.io/canonical/csi-node-driver-registrar:2.11.1-ck7
+    Image ID:      ghcr.io/canonical/csi-node-driver-registrar@sha256:07cb66ad8cd37423006c5dc0b313d7953e62be5361ab8ac133009dae9e7ea691
+    Port:          9809/TCP (healthz)
+    Host Port:     0/TCP (healthz)
+    Args:
+      --csi-address=$(ADDRESS)
+      --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+      --health-port=9809
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:59:48 +0800
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     500m
+      memory:  100Mi
+    Requests:
+      cpu:     10m
+      memory:  100Mi
+    Liveness:  http-get http://:healthz/healthz delay=5s timeout=5s period=10s #success=1 #failure=3
+    Environment:
+      ADDRESS:               /csi/csi.sock
+      DRIVER_REG_SOCK_PATH:  /var/lib/kubelet/plugins/rawfile-csi/csi.sock
+    Mounts:
+      /csi from socket-dir (rw)
+      /registration from registration-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-6gp2k (ro)
+  external-provisioner:
+    Container ID:  containerd://d15738375a649fcfdd7b2bb2249fb4f9bbd03ae4c6b02f62704977d4cdd42c29
+    Image:         ghcr.io/canonical/csi-provisioner:5.0.2-ck1
+    Image ID:      ghcr.io/canonical/csi-provisioner@sha256:6d9e534e0a25345b5f718b7b89b2f57688fcc00821ff81c4af777ade6c719db6
+    Port:          <none>
+    Host Port:     <none>
+    Args:
+      --csi-address=$(ADDRESS)
+      --feature-gates=Topology=true
+      --strict-topology
+      --immediate-topology=false
+      --timeout=120s
+      --enable-capacity=true
+      --capacity-ownerref-level=1
+      --node-deployment=true
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:59:48 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      ADDRESS:    /csi/csi.sock
+      NODE_NAME:   (v1:spec.nodeName)
+      NAMESPACE:  kube-system (v1:metadata.namespace)
+      POD_NAME:   ck-storage-rawfile-csi-node-6w4gq (v1:metadata.name)
+    Mounts:
+      /csi from socket-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-6gp2k (ro)
+  external-snapshotter:
+    Container ID:  containerd://f2a5621479166ae567a1aa92f28b609bc1277c27c8f7b8878af94257b29ad66b
+    Image:         ghcr.io/canonical/csi-snapshotter:8.0.2-ck1
+    Image ID:      ghcr.io/canonical/csi-snapshotter@sha256:a476cd681f9bd50f5c698774c9c5e2d798608759a4592d3e8937bcf6bd7c848a
+    Port:          <none>
+    Host Port:     <none>
+    Args:
+      --csi-address=$(ADDRESS)
+      --node-deployment=true
+      --extra-create-metadata=true
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:59:48 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      ADDRESS:    /csi/csi.sock
+      NODE_NAME:   (v1:spec.nodeName)
+    Mounts:
+      /csi from socket-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-6gp2k (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       True
+  ContainersReady             True
+  PodScheduled                True
+Volumes:
+  registration-dir:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/lib/kubelet/plugins_registry
+    HostPathType:  Directory
+  socket-dir:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/lib/kubelet/plugins/rawfile-csi
+    HostPathType:  DirectoryOrCreate
+  mountpoint-dir:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/lib/kubelet
+    HostPathType:  DirectoryOrCreate
+  data-dir:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/snap/k8s/common/rawfile-storage
+    HostPathType:  DirectoryOrCreate
+  kube-api-access-6gp2k:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 op=Exists
+                             node.kubernetes.io/disk-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/memory-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/not-ready:NoExecute op=Exists
+                             node.kubernetes.io/pid-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/unreachable:NoExecute op=Exists
+                             node.kubernetes.io/unschedulable:NoSchedule op=Exists
+Events:                      <none>
+
+
+Name:             coredns-6b547dbbd-cwcmw
+Namespace:        kube-system
+Priority:         0
+Service Account:  coredns
+Node:             think/192.168.0.123
+Start Time:       Tue, 09 Sep 2025 01:58:03 +0800
+Labels:           app.kubernetes.io/instance=ck-dns
+                  app.kubernetes.io/name=coredns
+                  k8s-app=coredns
+                  pod-template-hash=6b547dbbd
+Annotations:      checksum/config: fc4c9b56cf9b744229b59b8dd4ae4d31d7bb5b8a21d2589279812d3ddb6e384f
+                  scheduler.alpha.kubernetes.io/tolerations: [{"key":"CriticalAddonsOnly", "operator":"Exists"}]
+Status:           Running
+IP:               10.1.0.190
+IPs:
+  IP:           10.1.0.190
+Controlled By:  ReplicaSet/coredns-6b547dbbd
+Containers:
+  coredns:
+    Container ID:  containerd://12c2c35227392581980e87b19b43779279bf8c1f89603e3e93618000d426fb0d
+    Image:         ghcr.io/canonical/coredns:1.12.3-ck1
+    Image ID:      ghcr.io/canonical/coredns@sha256:ee0aac2bbbe20afaad1a15cb7c1b0e00827ae7c2d736658b590516872a75b127
+    Ports:         53/UDP (udp-53), 53/TCP (tcp-53), 9153/TCP (tcp-9153)
+    Host Ports:    0/UDP (udp-53), 0/TCP (tcp-53), 0/TCP (tcp-9153)
+    Args:
+      -conf
+      /etc/coredns/Corefile
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:58:03 +0800
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     100m
+      memory:  128Mi
+    Requests:
+      cpu:        100m
+      memory:     128Mi
+    Liveness:     http-get http://:8080/health delay=60s timeout=5s period=10s #success=1 #failure=5
+    Readiness:    http-get http://:8181/ready delay=30s timeout=5s period=5s #success=1 #failure=1
+    Environment:  <none>
+    Mounts:
+      /etc/coredns from config-volume (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-ct82t (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       True
+  ContainersReady             True
+  PodScheduled                True
+Volumes:
+  config-volume:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      ck-dns-coredns
+    Optional:  false
+  kube-api-access-ct82t:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Guaranteed
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
+
+
+Name:                 metrics-server-8d78c8b94-2jjmb
+Namespace:            kube-system
+Priority:             2000000000
+Priority Class Name:  system-cluster-critical
+Service Account:      metrics-server
+Node:                 think/192.168.0.123
+Start Time:           Tue, 09 Sep 2025 01:59:15 +0800
+Labels:               app.kubernetes.io/instance=metrics-server
+                      app.kubernetes.io/name=metrics-server
+                      pod-template-hash=8d78c8b94
+Annotations:          <none>
+Status:               Running
+IP:                   10.1.0.65
+IPs:
+  IP:           10.1.0.65
+Controlled By:  ReplicaSet/metrics-server-8d78c8b94
+Containers:
+  metrics-server:
+    Container ID:    containerd://72c8dc2437bcf018be89922cc30084290c793d932d41e7b36df9df628ffad76a
+    Image:           ghcr.io/canonical/metrics-server:0.8.0-ck1
+    Image ID:        ghcr.io/canonical/metrics-server@sha256:b2a78ab2acbdcbb72027bf900d5f25fe56f8cb3724b7fed8cbce7978445c4bc4
+    Port:            10250/TCP (https)
+    Host Port:       0/TCP (https)
+    SeccompProfile:  RuntimeDefault
+    Args:
+      --secure-port=10250
+      --cert-dir=/tmp
+      --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+      --kubelet-use-node-status-port
+      --metric-resolution=15s
+    State:          Running
+      Started:      Tue, 09 Sep 2025 01:59:16 +0800
+    Ready:          True
+    Restart Count:  0
+    Requests:
+      cpu:        100m
+      memory:     200Mi
+    Liveness:     http-get https://:https/livez delay=0s timeout=1s period=10s #success=1 #failure=3
+    Readiness:    http-get https://:https/readyz delay=20s timeout=1s period=10s #success=1 #failure=3
+    Environment:  <none>
+    Mounts:
+      /tmp from tmp (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-6r4cs (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       True
+  ContainersReady             True
+  PodScheduled                True
+Volumes:
+  tmp:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+    SizeLimit:  <unset>
+  kube-api-access-6r4cs:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
+anan@think:~$
