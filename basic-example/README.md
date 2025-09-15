@@ -20,9 +20,14 @@
 - **配置**: 只能在集群内部访问，使用Service名称进行DNS解析
 
 ### test-clusterip.sh
-- **类型**: 测试脚本
+- **类型**: 测试脚本（自动检测kubectl命令）
 - **功能**: 自动化测试ClusterIP Service的访问
 - **配置**: 创建测试Pod并验证集群内部访问
+
+### test-clusterip-simple.sh
+- **类型**: 测试脚本（简化版）
+- **功能**: 使用固定的kubectl命令进行测试
+- **配置**: 适用于特定环境的kubectl命令
 
 ## 部署步骤
 
@@ -136,6 +141,9 @@ kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http:
 ```bash
 # 使用自动化测试脚本（推荐）
 ./test-clusterip.sh
+
+# 如果遇到kubectl命令问题，使用简化版脚本
+./test-clusterip-simple.sh
 ```
 
 ### 手动测试步骤
@@ -342,6 +350,21 @@ kubectl delete -f .
    
    # 检查防火墙设置
    sudo ufw status
+   ```
+
+4. **kubectl命令未找到**
+   ```bash
+   # 问题：脚本中无法识别alias设置的kubectl命令
+   # 解决方案1：使用简化版脚本
+   ./test-clusterip-simple.sh
+   
+   # 解决方案2：手动设置环境变量
+   export KUBECTL_CMD="sudo k8s kubectl"
+   ./test-clusterip.sh
+   
+   # 解决方案3：直接使用完整命令
+   sudo k8s kubectl apply -f clusterip-service.yaml
+   sudo k8s kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-clusterip
    ```
 
 ### 调试命令

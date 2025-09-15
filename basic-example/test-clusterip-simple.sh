@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ClusterIP Service 测试脚本
+# ClusterIP Service 测试脚本（简化版）
 # 用于测试集群内部访问nginx服务
 
 echo "=== ClusterIP Service 测试脚本 ==="
@@ -13,33 +13,18 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 自动检测kubectl命令
-detect_kubectl() {
-    # 尝试不同的kubectl命令
-    if command -v kubectl &> /dev/null && kubectl version --client &> /dev/null; then
-        echo "kubectl"
-    elif sudo k8s kubectl version --client &> /dev/null; then
-        echo "sudo k8s kubectl"
-    elif command -v k3s &> /dev/null && k3s kubectl version --client &> /dev/null; then
-        echo "k3s kubectl"
-    else
-        echo ""
-    fi
-}
+# 设置kubectl命令（根据您的环境调整）
+KUBECTL_CMD="sudo k8s kubectl"
 
-# 检测kubectl命令
-KUBECTL_CMD=$(detect_kubectl)
-
-if [ -z "$KUBECTL_CMD" ]; then
-    echo -e "${RED}错误: 无法找到可用的kubectl命令${NC}"
-    echo -e "${YELLOW}请尝试以下命令之一:${NC}"
-    echo "  - kubectl version"
-    echo "  - sudo k8s kubectl version"
-    echo "  - k3s kubectl version"
+# 检查kubectl是否可用
+if ! $KUBECTL_CMD version --client &> /dev/null; then
+    echo -e "${RED}错误: kubectl 命令未找到或无法访问${NC}"
+    echo -e "${YELLOW}请确保k8s命令可用: sudo k8s kubectl version${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}使用kubectl命令: $KUBECTL_CMD${NC}"
+echo
 
 echo -e "${BLUE}1. 检查nginx deployment状态...${NC}"
 $KUBECTL_CMD get deployment nginx-deployment
