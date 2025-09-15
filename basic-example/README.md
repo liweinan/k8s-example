@@ -14,6 +14,16 @@
 - **功能**: 将nginx服务暴露到集群外部
 - **配置**: 通过节点端口30000访问nginx服务
 
+### clusterip-service.yaml
+- **类型**: Service (ClusterIP)
+- **功能**: 在集群内部暴露nginx服务
+- **配置**: 只能在集群内部访问，使用Service名称进行DNS解析
+
+### test-clusterip.sh
+- **类型**: 测试脚本
+- **功能**: 自动化测试ClusterIP Service的访问
+- **配置**: 创建测试Pod并验证集群内部访问
+
 ## 部署步骤
 
 ### 1. 部署nginx应用
@@ -71,7 +81,9 @@ think   Ready    control-plane   1d    v1.28.2   192.168.0.123   <none>        U
 
 ### 4. 访问nginx服务
 
-使用以下方式访问nginx服务：
+#### 4.1 外部访问 (NodePort)
+
+使用以下方式从集群外部访问nginx服务：
 
 ```bash
 # 方式1: 通过节点IP和NodePort访问
@@ -90,6 +102,72 @@ curl http://192.168.0.123:30000
 ...
 </html>
 ```
+
+#### 4.2 集群内部访问 (ClusterIP)
+
+```bash
+# 创建ClusterIP Service
+kubectl apply -f clusterip-service.yaml
+
+# 方式1: 使用测试脚本（推荐）
+./test-clusterip.sh
+
+# 方式2: 手动创建测试Pod
+kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-clusterip
+
+# 方式3: 使用完整域名
+kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-clusterip.default.svc.cluster.local
+```
+
+**预期输出**:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+...
+</html>
+```
+
+## ClusterIP Service 测试
+
+### 快速测试
+
+```bash
+# 使用自动化测试脚本（推荐）
+./test-clusterip.sh
+```
+
+### 手动测试步骤
+
+```bash
+# 1. 创建ClusterIP Service
+kubectl apply -f clusterip-service.yaml
+
+# 2. 验证Service状态
+kubectl get svc nginx-clusterip
+kubectl describe svc nginx-clusterip
+
+# 3. 创建测试Pod
+kubectl run test-pod --image=busybox --rm -it --restart=Never -- /bin/sh
+
+# 4. 在Pod内部测试
+# wget -qO- http://nginx-clusterip
+# nslookup nginx-clusterip
+# nc -zv nginx-clusterip 80
+```
+
+### 测试脚本功能
+
+`test-clusterip.sh` 脚本会自动执行以下测试：
+
+1. ✅ 检查nginx deployment状态
+2. ✅ 检查nginx pods状态  
+3. ✅ 创建ClusterIP Service
+4. ✅ 验证Service状态
+5. ✅ 检查Service的Endpoints
+6. ✅ 创建测试Pod并执行内部访问测试
+7. ✅ 清理测试资源
 
 ## 验证部署
 
@@ -148,6 +226,8 @@ spec:
 
 ### Service配置详解
 
+#### NodePort Service (service.yaml)
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -162,6 +242,23 @@ spec:
       port: 80                   # Service内部端口
       targetPort: 80             # Pod端口
       nodePort: 30000            # 节点端口（30000-32767）
+```
+
+#### ClusterIP Service (clusterip-service.yaml)
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-clusterip
+spec:
+  type: ClusterIP                # Service类型（默认）
+  selector:
+    app: nginx                   # 选择器（匹配Pod标签）
+  ports:
+    - protocol: TCP
+      port: 80                   # Service内部端口
+      targetPort: 80             # Pod端口
 ```
 
 ## 常用操作
@@ -196,8 +293,11 @@ kubectl rollout undo deployment/nginx-deployment
 ## 清理资源
 
 ```bash
-# 删除Service
+# 删除NodePort Service
 kubectl delete -f service.yaml
+
+# 删除ClusterIP Service
+kubectl delete -f clusterip-service.yaml
 
 # 删除Deployment
 kubectl delete -f deployment.yaml
@@ -259,6 +359,7 @@ kubectl exec -n kube-system ds/cilium -- cilium status
 
 ## 网络架构
 
+### NodePort 访问流程
 ```
 外部客户端
     ↓
@@ -269,12 +370,27 @@ Cilium eBPF (网络转发)
 nginx Pod (10.1.0.x:80)
 ```
 
+### ClusterIP 访问流程
+```
+集群内部Pod
+    ↓ DNS查询
+CoreDNS (nginx-clusterip)
+    ↓ 返回Service IP
+nginx-clusterip (10.96.x.x)
+    ↓ Cilium eBPF转发
+nginx Pod (10.1.0.x:80)
+```
+
 ## 注意事项
 
 1. **端口范围**: NodePort端口必须在30000-32767范围内
 2. **防火墙**: 确保节点防火墙允许NodePort端口访问
 3. **网络策略**: 如果启用了网络策略，需要相应配置
 4. **资源限制**: 生产环境建议设置资源限制和请求
+5. **Service类型选择**:
+   - **NodePort**: 适合开发/测试环境，外部访问
+   - **ClusterIP**: 适合集群内部服务通信，更安全
+6. **DNS解析**: ClusterIP Service支持多种域名格式访问
 
 ## 扩展阅读
 
