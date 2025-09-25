@@ -117,11 +117,14 @@ kubectl apply -f clusterip-service.yaml
 # 方式1: 使用测试脚本（推荐）
 ./test-clusterip.sh
 
-# 方式2: 手动创建测试Pod
+# 方式2: 使用alpine容器测试（推荐）
+kubectl run test-pod --image=alpine --rm -it --restart=Never -- sh -c "apk add --no-cache curl && curl http://nginx-clusterip"
+
+# 方式3: 使用busybox容器测试
 kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-clusterip
 
-# 方式3: 使用完整域名
-kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-clusterip.default.svc.cluster.local
+# 方式4: 使用完整域名
+kubectl run test-pod --image=alpine --rm -it --restart=Never -- sh -c "apk add --no-cache curl && curl http://nginx-clusterip.default.svc.cluster.local"
 ```
 
 **预期输出**:
@@ -156,11 +159,15 @@ kubectl apply -f clusterip-service.yaml
 kubectl get svc nginx-clusterip
 kubectl describe svc nginx-clusterip
 
-# 3. 创建测试Pod
-kubectl run test-pod --image=busybox --rm -it --restart=Never -- /bin/sh
+# 3. 检查Endpoints
+kubectl get endpoints nginx-clusterip
 
-# 4. 在Pod内部测试
-# wget -qO- http://nginx-clusterip
+# 4. 创建测试Pod（alpine容器）
+kubectl run test-pod --image=alpine --rm -it --restart=Never -- /bin/sh
+
+# 5. 在Pod内部测试
+# apk add --no-cache curl
+# curl http://nginx-clusterip
 # nslookup nginx-clusterip
 # nc -zv nginx-clusterip 80
 ```
@@ -175,6 +182,10 @@ kubectl run test-pod --image=busybox --rm -it --restart=Never -- /bin/sh
 4. ✅ 验证Service状态
 5. ✅ 检查Service的Endpoints
 6. ✅ 创建测试Pod并执行内部访问测试
+   - DNS解析测试
+   - 网络连通性测试
+   - HTTP访问测试
+   - 完整域名访问测试
 7. ✅ 清理测试资源
 
 ## 验证部署
@@ -199,8 +210,8 @@ kubectl get endpoints nginx-service
 
 ### 检查网络连通性
 ```bash
-# 在集群内部测试Service访问
-kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-service
+# 在集群内部测试Service访问（alpine容器）
+kubectl run test-pod --image=alpine --rm -it --restart=Never -- sh -c "apk add --no-cache curl && curl http://nginx-service"
 
 # 测试NodePort访问
 curl -I http://192.168.0.123:30000
@@ -364,7 +375,42 @@ kubectl delete -f .
    
    # 解决方案3：直接使用完整命令
    sudo k8s kubectl apply -f clusterip-service.yaml
-   sudo k8s kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-clusterip
+   sudo k8s kubectl run test-pod --image=alpine --rm -it --restart=Never -- sh -c "apk add --no-cache curl && curl http://nginx-clusterip"
+   ```
+
+5. **ping失败但HTTP访问正常**
+   ```bash
+   # 问题：ping nginx-clusterip 失败，但curl访问成功
+   # 原因：Kubernetes Service通常只转发TCP/UDP流量，不转发ICMP
+   # 解决方案：使用HTTP测试而不是ping测试
+   
+   # 正确的测试方法
+   kubectl run test-pod --image=alpine --rm -it --restart=Never -- sh -c "apk add --no-cache curl && curl http://nginx-clusterip"
+   
+   # 或者使用wget
+   kubectl run test-pod --image=busybox --rm -it --restart=Never -- wget -qO- http://nginx-clusterip
+   ```
+
+6. **Service Endpoints为空**
+   ```bash
+   # 问题：kubectl get endpoints nginx-clusterip 显示 <none>
+   # 原因：Service没有找到匹配的Pod
+   
+   # 检查步骤：
+   # 1. 确认deployment已创建
+   kubectl get deployment nginx-deployment
+   
+   # 2. 确认pod正在运行
+   kubectl get pods -l app=nginx
+   
+   # 3. 检查pod标签
+   kubectl get pods --show-labels
+   
+   # 4. 检查service选择器
+   kubectl get svc nginx-clusterip -o yaml
+   
+   # 5. 如果deployment不存在，重新创建
+   kubectl apply -f deployment.yaml
    ```
 
 ### 调试命令

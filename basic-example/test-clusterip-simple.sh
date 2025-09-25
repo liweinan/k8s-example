@@ -54,23 +54,29 @@ echo -e "${BLUE}7. 创建测试Pod并测试ClusterIP访问...${NC}"
 echo "正在创建测试Pod..."
 
 # 创建测试Pod并执行测试
-$KUBECTL_CMD run clusterip-test --image=busybox --rm -it --restart=Never -- /bin/sh -c "
+$KUBECTL_CMD run clusterip-test --image=alpine --rm -it --restart=Never -- /bin/sh -c "
 echo '=== 在测试Pod内部执行测试 ==='
 echo
-echo '1. 测试DNS解析:'
+echo '1. 安装必要工具:'
+apk add --no-cache curl bind-tools netcat-openbsd
+echo
+echo '2. 测试DNS解析:'
 nslookup nginx-clusterip
 echo
-echo '2. 测试网络连通性:'
+echo '3. 测试网络连通性:'
 nc -zv nginx-clusterip 80
 echo
-echo '3. 测试HTTP访问:'
-wget -qO- http://nginx-clusterip
+echo '4. 测试HTTP访问:'
+curl -s http://nginx-clusterip
 echo
-echo '4. 测试完整域名访问:'
-wget -qO- http://nginx-clusterip.default.svc.cluster.local
+echo '5. 测试完整域名访问:'
+curl -s http://nginx-clusterip.default.svc.cluster.local
 echo
-echo '5. 查看DNS配置:'
+echo '6. 查看DNS配置:'
 cat /etc/resolv.conf
+echo
+echo '7. 测试ping（可能失败，这是正常的）:'
+ping -c 2 nginx-clusterip || echo 'ping失败是正常的，Kubernetes Service通常不转发ICMP流量'
 echo
 echo '=== 测试完成 ==='
 "
@@ -87,3 +93,5 @@ echo "- ClusterIP Service只能在集群内部访问"
 echo "- 外部无法直接访问ClusterIP Service"
 echo "- 使用Service名称进行DNS解析"
 echo "- 支持负载均衡到多个Pod"
+echo "- ping失败是正常的，Kubernetes Service通常不转发ICMP流量"
+echo "- 使用HTTP/HTTPS测试连接而不是ping"
