@@ -51,7 +51,7 @@ spec:
     spec:
       containers:
         - name: other-app
-          image: node:18
+          image: node:18-alpine
           ports:
             - containerPort: 9090
           command: [ "node", "-e", "require('http').createServer((req, res) => { res.writeHead(200); res.end('Hello from Other Service!'); }).listen(9090)" ]
