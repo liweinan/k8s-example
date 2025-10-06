@@ -142,12 +142,12 @@ echo "External IP: $EXTERNAL_IP"
 
 ## 示例部署
 
-### 示例 1: 基础 Nginx 服务
+### 示例 1: 基础 Ingress 服务
 
 #### 部署服务
 ```bash
 # 应用配置
-kubectl apply -f nginx-k8s-deployment.yaml
+kubectl apply -f basic-ingress.yaml
 ```
 
 #### 验证部署
@@ -174,7 +174,7 @@ curl http://$EXTERNAL_IP
 
 #### 清理资源
 ```bash
-kubectl delete -f nginx-k8s-deployment.yaml
+kubectl delete -f basic-ingress.yaml
 ```
 
 ### 示例 2: 路径路由
@@ -184,7 +184,7 @@ kubectl delete -f nginx-k8s-deployment.yaml
 #### 部署服务
 ```bash
 # 应用配置
-kubectl apply -f multi-service-ingress-by-path.yaml
+kubectl apply -f path-ingress.yaml
 ```
 
 #### 验证部署
@@ -216,7 +216,7 @@ curl -H "Host: example.com" http://192.168.1.200/other
 
 #### 清理资源
 ```bash
-kubectl delete -f multi-service-ingress-by-path.yaml
+kubectl delete -f path-ingress.yaml
 ```
 
 ### 示例 3: 子域名路由
@@ -283,7 +283,7 @@ ingress-nginx-controller-admission   ClusterIP      10.152.183.135   <none>     
 
 #### 单服务部署
 
-在 `nginx-k8s-deployment.yaml` 中：
+在 `basic-ingress.yaml` 中：
 
 ```yaml
 apiVersion: v1
@@ -307,7 +307,7 @@ spec:
 
 #### 多服务路径路由
 
-在 `multi-service-ingress-by-path.yaml` 中：
+在 `path-ingress.yaml` 中：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -566,10 +566,10 @@ spec:
 ### 清理所有示例资源
 ```bash
 # 清理示例 1
-kubectl delete -f nginx-k8s-deployment.yaml
+kubectl delete -f basic-ingress.yaml
 
 # 清理示例 2
-kubectl delete -f multi-service-ingress-by-path.yaml
+kubectl delete -f path-ingress.yaml
 
 # 清理示例 3
 kubectl delete -f subdomain-ingress.yaml
@@ -630,8 +630,8 @@ kubectl delete -f metallb-config.yaml
 ## 📁 文件说明
 
 - `metallb-config.yaml` - MetalLB 配置文件
-- `nginx-k8s-deployment.yaml` - 基础 Nginx 服务配置
-- `multi-service-ingress-by-path.yaml` - 路径路由示例
+- `basic-ingress.yaml` - 基础 Ingress 服务配置
+- `path-ingress.yaml` - 路径路由示例
 - `subdomain-ingress.yaml` - 子域名路由示例
 
 ## 🤝 贡献
