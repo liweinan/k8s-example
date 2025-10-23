@@ -4,6 +4,13 @@
 
 echo "=== Kubernetes Sidecar 模式测试 ==="
 
+# 定义 k 函数（如果不存在）
+if ! type k &> /dev/null; then
+    k() {
+        sudo k8s kubectl "$@"
+    }
+fi
+
 # 设置 kubectl 命令
 KUBECTL_CMD="k"
 
