@@ -12,7 +12,7 @@ fi
 
 # 部署资源
 echo "1. 部署 Pod 和 Service..."
-kubectl apply -f sidecar-pod.yaml
+kubectl apply -f deployment.yaml
 kubectl apply -f service.yaml
 
 # 等待 Pod 就绪
@@ -71,4 +71,4 @@ kubectl exec sidecar-example -c main-app -- curl -s http://localhost:8081/ | jq 
 echo -e "\n=== 测试完成 ==="
 echo "要清理资源，请运行:"
 echo "kubectl delete -f service.yaml"
-echo "kubectl delete -f sidecar-pod.yaml"
+echo "kubectl delete -f deployment.yaml"

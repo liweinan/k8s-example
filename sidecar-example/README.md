@@ -34,11 +34,10 @@ Sidecar 模式是一种云原生设计模式，其中：
 
 - `main-app.py` - 主应用容器代码（Web 服务器）
 - `sidecar-app.py` - Sidecar 容器代码（日志收集和监控）
-- `sidecar-pod.yaml` - Pod 清单文件，包含两个容器
-- `sidecar-pod-docker.yaml` - 使用 Docker 镜像的 Pod 清单
-- `service.yaml` - Service 配置，暴露两个端口
 - `Dockerfile.main-app` - 主应用 Dockerfile
 - `Dockerfile.sidecar` - Sidecar Dockerfile
+- `deployment.yaml` - Pod 部署清单
+- `service.yaml` - Service 配置，暴露两个端口
 - `build-images.sh` - 构建 Docker 镜像脚本
 - `test.sh` - 自动化测试脚本
 
@@ -60,43 +59,36 @@ Sidecar 模式是一种云原生设计模式，其中：
 - 持续收集主应用的日志
 - 监控主应用的健康状态
 
-## 部署方式
+## 部署和使用
 
-### 方式 1：使用 ConfigMap（开发测试）
-
-```bash
-# 部署 Pod 和 Service
-kubectl apply -f sidecar-pod.yaml
-kubectl apply -f service.yaml
-
-# 运行测试
-./test.sh
-```
-
-### 方式 2：使用 Docker 镜像（生产推荐）
+### 1. 构建 Docker 镜像
 
 ```bash
 # 构建镜像
 ./build-images.sh
+```
 
-# 部署
-kubectl apply -f sidecar-pod-docker.yaml
+**注意**: 如果遇到网络问题，请配置代理：
+```bash
+export HTTP_PROXY=http://your-proxy:port
+export HTTPS_PROXY=http://your-proxy:port
+./build-images.sh
+```
+
+或者修改 `build-images.sh` 中的构建命令，取消注释代理参数。
+
+### 2. 部署到 Kubernetes
+
+```bash
+# 部署 Pod 和 Service
+kubectl apply -f deployment.yaml
 kubectl apply -f service.yaml
 
 # 运行测试
 ./test.sh
 ```
 
-## 测试和使用
-
-### 1. 检查 Pod 状态
-
-```bash
-kubectl get pods
-kubectl get svc
-```
-
-### 2. 测试主应用
+### 3. 手动测试
 
 ```bash
 # 获取 Pod IP
@@ -105,12 +97,8 @@ POD_IP=$(kubectl get pod sidecar-example -o jsonpath='{.status.podIP}')
 # 测试主应用
 curl http://$POD_IP:8080/
 curl http://$POD_IP:8080/health
-```
 
-### 3. 测试 Sidecar
-
-```bash
-# 测试 Sidecar 功能
+# 测试 Sidecar
 curl http://$POD_IP:8081/
 curl http://$POD_IP:8081/logs
 curl http://$POD_IP:8081/metrics
@@ -149,13 +137,8 @@ kubectl exec sidecar-example -c main-app -- cat /shared/logs/main-app.log
 ## 清理资源
 
 ```bash
-# 清理 ConfigMap 方式
 kubectl delete -f service.yaml
-kubectl delete -f sidecar-pod.yaml
-
-# 清理 Docker 镜像方式
-kubectl delete -f service.yaml
-kubectl delete -f sidecar-pod-docker.yaml
+kubectl delete -f deployment.yaml
 ```
 
 ## 实际应用场景
@@ -174,3 +157,4 @@ kubectl delete -f sidecar-pod-docker.yaml
 2. **可复用性**：同一个 Sidecar 可以用于多个应用
 3. **独立升级**：可以独立更新 Sidecar 而不影响主应用
 4. **技术栈无关**：Sidecar 可以用不同语言编写
+5. **生产就绪**：使用 Docker 镜像，便于 CI/CD 和版本管理
