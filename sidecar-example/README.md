@@ -15,12 +15,12 @@ Sidecar 模式是一种云原生设计模式，其中：
 ┌─────────────────────────────────────┐
 │              Pod                    │
 │  ┌─────────────────┐ ┌─────────────┐│
-│  │   Main App      │ │   Sidecar    ││
-│  │   (Port 8080)   │ │  (Port 8081) ││
+│  │   Main App      │ │   Sidecar   ││
+│  │   (Port 8080)   │ │ (Port 8081) ││
 │  │                 │ │             ││
-│  │ - Web Server    │ │ - Logs       ││
-│  │ - Business Logic│ │ - Monitoring ││
-│  │ - Health Check  │ │ - Metrics    ││
+│  │ - Web Server    │ │ - Logs      ││
+│  │ - Business Logic│ │ - Monitoring││
+│  │ - Health Check  │ │ - Metrics   ││
 │  └─────────────────┘ └─────────────┘│
 │           │               │         │
 │           └───────┬───────┘         │
@@ -128,6 +128,18 @@ kubectl exec sidecar-example -c main-app -- cat /shared/logs/main-app.log
 两个容器共享 `/shared` 存储卷：
 - 主应用将日志写入 `/shared/logs/main-app.log`
 - Sidecar 容器读取这个文件进行日志处理
+
+#### 数据流向图
+```
+主应用容器                    Sidecar 容器
+     │                           |
+     │ 写入日志                   | 读取日志
+     ▼                           ▼
+/shared/logs/main-app.log ←→ /shared/logs/main-app.log
+     ▲                           ▲
+     │                           │
+     └─────── 共享存储卷 ─────────┘
+```
 
 ### 3. 生命周期管理
 - 两个容器同时启动和停止
