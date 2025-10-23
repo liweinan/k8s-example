@@ -12,22 +12,41 @@ Sidecar 模式是一种云原生设计模式，其中：
 ## 示例架构
 
 ```
-┌─────────────────────────────────────┐
-│              Pod                    │
-│  ┌─────────────────┐ ┌─────────────┐│
-│  │   Main App      │ │   Sidecar   ││
-│  │   (Port 8080)   │ │ (Port 8081) ││
-│  │                 │ │             ││
-│  │ - Web Server    │ │ - Logs      ││
-│  │ - Business Logic│ │ - Monitoring││
-│  │ - Health Check  │ │ - Metrics   ││
-│  └─────────────────┘ └─────────────┘│
-│           │               │         │
-│           └───────┬───────┘         │
-│                   │                 │
-│            Shared Storage           │
-│            (/shared/logs)           │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Pod (Shared IP: 10.1.0.35)               │
+│                                                                 │
+│  ┌─────────────────────────┐    ┌─────────────────────────────┐ │
+│  │     Main App Container  │    │    Sidecar Container        │ │
+│  │                         │    │                             │ │
+│  │  ┌─────────────────┐    │    │  ┌─────────────────────┐    │ │
+│  │  │   Web Server    │    │    │  │   Log Collector     │    │ │
+│  │  │   Port: 8080    │    │    │  │   Port: 8081        │    │ │
+│  │  │                 │    │    │  │                     │    │ │
+│  │  │ - Business API  │    │    │  │ - Log Processing    │    │ │
+│  │  │ - Health Check  │    │    │  │ - Metrics Export    │    │ │
+│  │  │ - Write Logs    │    │    │  │ - Monitor Health    │    │ │
+│  │  └─────────────────┘    │    │  └─────────────────────┘    │ │
+│  └─────────────────────────┘    └─────────────────────────────┘ │
+│           │                                    │                │
+│           │  localhost:8081                    │ localhost:8080 │
+│           │◄──────────────────────────────────►│                │
+│           │                                    │                │
+│           └──────────────┬─────────────────────┘                │                           
+│                          │                                      │
+│                    ┌─────▼─────┐                                │
+│                    │  Shared   │                                │
+│                    │  Storage  │                                │
+│                    │ /shared/  │                                │
+│                    │   logs/   │                                │
+│                    │           │                                │
+│                    │ main-app  │                                │
+│                    │   .log    │                                │
+│                    └───────────┘                                │
+└─────────────────────────────────────────────────────────────────┘
+
+网络通信:
+Main App  ←→ Sidecar: localhost:8080 ←→ localhost:8081
+外部访问: Pod IP:8080 (Main App) | Pod IP:8081 (Sidecar)
 ```
 
 ## 文件说明
@@ -129,16 +148,16 @@ kubectl exec sidecar-example -c main-app -- cat /shared/logs/main-app.log
 - 主应用将日志写入 `/shared/logs/main-app.log`
 - Sidecar 容器读取这个文件进行日志处理
 
-#### 数据流向图
+#### Data Flow Diagram
 ```
-主应用容器                    Sidecar 容器
-     │                           |
-     │ 写入日志                   | 读取日志
-     ▼                           ▼
+Main App Container              Sidecar Container
+     │                               │
+     │ Write Logs                    │ Read Logs
+     ▼                               ▼
 /shared/logs/main-app.log ←→ /shared/logs/main-app.log
-     ▲                           ▲
-     │                           │
-     └─────── 共享存储卷 ─────────┘
+     ▲                               ▲
+     │                               │
+     └───────── Shared Volume ───────┘
 ```
 
 ### 3. 生命周期管理
