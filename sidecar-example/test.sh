@@ -73,10 +73,10 @@ $KUBECTL_CMD logs sidecar-example -c sidecar --tail=5
 # 测试容器间通信
 echo -e "\n7. 测试容器间通信:"
 echo "从 Sidecar 容器访问主应用:"
-$KUBECTL_CMD exec sidecar-example -c sidecar -- curl -s http://localhost:8080/health | jq .
+$KUBECTL_CMD exec sidecar-example -c sidecar -- python3 -c "import urllib.request, json; response = urllib.request.urlopen('http://localhost:8080/health', timeout=5); print(json.dumps(json.loads(response.read().decode()), indent=2))"
 
 echo -e "\n从主应用容器访问 Sidecar:"
-$KUBECTL_CMD exec sidecar-example -c main-app -- curl -s http://localhost:8081/ | jq .
+$KUBECTL_CMD exec sidecar-example -c main-app -- python3 -c "import urllib.request, json; response = urllib.request.urlopen('http://localhost:8081/', timeout=5); print(json.dumps(json.loads(response.read().decode()), indent=2))"
 
 echo -e "\n=== 测试完成 ==="
 echo "要清理资源，请运行:"
