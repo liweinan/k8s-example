@@ -9,6 +9,7 @@ spec:
   # 主应用容器
   - name: main-app
     image: sidecar-main-app:latest
+    imagePullPolicy: Never
     ports:
     - containerPort: 8080
       name: main-app-port
@@ -29,6 +30,7 @@ spec:
   # Sidecar 容器
   - name: sidecar
     image: sidecar-sidecar:latest
+    imagePullPolicy: Never
     ports:
     - containerPort: 8081
       name: sidecar-port
