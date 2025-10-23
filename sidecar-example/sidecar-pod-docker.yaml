@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-example-docker
+  labels:
+    app: sidecar-example
+spec:
+  containers:
+  # 主应用容器
+  - name: main-app
+    image: sidecar-main-app:latest
+    ports:
+    - containerPort: 8080
+      name: main-app-port
+    volumeMounts:
+    - name: shared-storage
+      mountPath: /shared
+    env:
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+
+  # Sidecar 容器
+  - name: sidecar
+    image: sidecar-sidecar:latest
+    ports:
+    - containerPort: 8081
+      name: sidecar-port
+    volumeMounts:
+    - name: shared-storage
+      mountPath: /shared
+    env:
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+
+  # 共享存储卷
+  volumes:
+  - name: shared-storage
+    emptyDir: {}
