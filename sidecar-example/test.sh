@@ -7,9 +7,9 @@ echo "=== Kubernetes Sidecar 模式测试 ==="
 # 设置 kubectl 命令
 KUBECTL_CMD="k"
 
-# 检查 kubectl 是否可用
-if ! command -v $KUBECTL_CMD &> /dev/null; then
-    echo "错误: $KUBECTL_CMD 命令未安装或不在 PATH 中"
+# 检查 kubectl 是否可用（兼容命令、函数、别名等）
+if ! type $KUBECTL_CMD &> /dev/null; then
+    echo "错误: $KUBECTL_CMD 未找到（可能是命令、函数或别名）"
     exit 1
 fi
 
