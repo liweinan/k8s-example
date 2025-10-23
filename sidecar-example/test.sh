@@ -35,28 +35,28 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 获取 Pod IP
-POD_IP=$($KUBECTL_CMD get pod sidecar-example -o jsonpath='{.status.podIP}')
-echo "Pod IP: $POD_IP"
+# 获取 Service IP
+SERVICE_IP=$($KUBECTL_CMD get svc sidecar-example-service -o jsonpath='{.spec.clusterIP}')
+echo "Service IP: $SERVICE_IP"
 
 # 测试主应用
 echo "3. 测试主应用..."
 echo "测试主应用根路径:"
-curl -s http://$POD_IP:8080/ | jq .
+curl -s --max-time 10 http://$SERVICE_IP:8080/ | jq .
 
 echo -e "\n测试主应用健康检查:"
-curl -s http://$POD_IP:8080/health | jq .
+curl -s --max-time 10 http://$SERVICE_IP:8080/health | jq .
 
 # 测试 Sidecar
 echo -e "\n4. 测试 Sidecar..."
 echo "测试 Sidecar 根路径:"
-curl -s http://$POD_IP:8081/ | jq .
+curl -s --max-time 10 http://$SERVICE_IP:8081/ | jq .
 
 echo -e "\n测试 Sidecar 日志收集:"
-curl -s http://$POD_IP:8081/logs | jq .
+curl -s --max-time 10 http://$SERVICE_IP:8081/logs | jq .
 
 echo -e "\n测试 Sidecar 指标:"
-curl -s http://$POD_IP:8081/metrics | jq .
+curl -s --max-time 10 http://$SERVICE_IP:8081/metrics | jq .
 
 # 检查共享存储
 echo -e "\n5. 检查共享存储中的日志文件:"
