@@ -1,0 +1,16 @@
+# Headless Service：为 StatefulSet Pod 提供稳定 DNS 记录
+# clusterIP: None → 每个 Pod 有独立 A 记录，而不是一个虚拟 IP
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-headless
+  labels:
+    app: web
+spec:
+  clusterIP: None
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
